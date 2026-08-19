@@ -6,10 +6,10 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v1';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v1';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v1';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v1';
+const STORAGE_KEY_RECORDS = 'car_records_db_v5';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v5';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v5';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v5';
 
 const state = {
   currentDate: new Date(), // 當前月曆檢視的基準日期
@@ -974,6 +974,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const mobileFloatingBtn = document.getElementById('mobileFloatingAddBtn');
   if (mobileFloatingBtn) {
     mobileFloatingBtn.addEventListener('click', () => openRecordModal());
+  }
+
+  // 手機/電腦重置與同步預設資料按鈕
+  const btnResetData = document.getElementById('btnResetData');
+  if (btnResetData) {
+    btnResetData.addEventListener('click', () => {
+      if (confirm('確定要清理這台裝置上的舊快取，並同步重置為最新系統預設數據嗎？')) {
+        localStorage.clear();
+        loadData();
+        refreshApp();
+        alert('✅ 裝置資料已成功重置與同步！');
+      }
+    });
   }
 
   // 點擊日曆格任何位置或 "+" 號皆觸發手寫簽名彈窗
