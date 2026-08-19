@@ -865,17 +865,40 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ------------------------------------------------------------------------
-  // A. 分頁切換 (Tabs)
+  // A. 分頁切換 (Tabs) 與預設開啟頁面控制
   // ------------------------------------------------------------------------
+  const switchView = (targetId) => {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-target') === targetId);
+    });
+    document.querySelectorAll('.view-section').forEach(v => {
+      if (v.id === targetId) {
+        v.classList.remove('hidden');
+      } else {
+        v.classList.add('hidden');
+      }
+    });
+    state.activeView = targetId;
+  };
+
+  // 強制確保無論透過電腦或手機開啟連結，均預設載入「月曆簽到視圖」
+  switchView('calendarView');
+
+  // 點擊頂部 Logo / 標題時自動返回「月曆簽到視圖」
+  const navBrand = document.querySelector('.navbar-brand');
+  if (navBrand) {
+    navBrand.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchView('calendarView');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // 監聽導覽列 Tab 按鈕點擊切換
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
-
-      btn.classList.add('active');
       const targetId = btn.getAttribute('data-target');
-      document.getElementById(targetId).classList.remove('hidden');
-      state.activeView = targetId;
+      switchView(targetId);
     });
   });
 
