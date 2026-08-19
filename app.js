@@ -13,18 +13,18 @@ const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v7';
 const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v7';
 
 const DEFAULT_PERSONNEL = [
-  { id: 'p1', name: '林大為', department: '總務課' },
-  { id: 'p2', name: '陳靜宜', department: '業務二組' },
-  { id: 'p3', name: '張明哲', department: '資訊處' },
-  { id: 'p4', name: '袁', department: '勤休組' },
-  { id: 'p5', name: '波', department: '勤休組' },
-  { id: 'p6', name: 'G', department: '勤務組' },
-  { id: 'p7', name: '治', department: '勤務組' },
-  { id: 'p8', name: '祿', department: '勤務組' },
-  { id: 'p9', name: '明', department: '勤務組' },
-  { id: 'p10', name: '放', department: '勤務組' },
-  { id: 'p11', name: '祥', department: '勤務組' },
-  { id: 'p12', name: '升', department: '勤務組' }
+  { id: 'p1', name: '林大為' },
+  { id: 'p2', name: '陳靜宜' },
+  { id: 'p3', name: '張明哲' },
+  { id: 'p4', name: '袁' },
+  { id: 'p5', name: '波' },
+  { id: 'p6', name: 'G' },
+  { id: 'p7', name: '治' },
+  { id: 'p8', name: '祿' },
+  { id: 'p9', name: '明' },
+  { id: 'p10', name: '放' },
+  { id: 'p11', name: '祥' },
+  { id: 'p12', name: '升' }
 ];
 
 const state = {
@@ -701,9 +701,6 @@ function renderPersonnel() {
       <div>
         <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
           <i class="fa-solid fa-user-circle" style="color: var(--primary-color);"></i> ${p.name}
-        </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
-          ${p.department || '一般同仁'}
         </div>
       </div>
       <div style="display: flex; gap: 0.25rem;">
@@ -1567,7 +1564,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const editId = document.getElementById('personnelEditId').value;
       const name = document.getElementById('personnelName').value.trim();
-      const department = document.getElementById('personnelDepartment').value.trim();
 
       if (!name) {
         alert('請輸入同仁姓名或簡稱');
@@ -1578,13 +1574,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = state.personnel.find(item => item.id === editId);
         if (p) {
           p.name = name;
-          p.department = department;
         }
       } else {
         const newP = {
           id: 'p-' + Date.now(),
-          name: name,
-          department: department
+          name: name
         };
         state.personnel.push(newP);
       }
@@ -1604,7 +1598,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p) {
         document.getElementById('personnelEditId').value = p.id;
         document.getElementById('personnelName').value = p.name;
-        document.getElementById('personnelDepartment').value = p.department || '';
         document.getElementById('modalPersonnelTitle').innerText = '編輯常用同仁資料';
         modalPersonnel.classList.add('active');
       }
