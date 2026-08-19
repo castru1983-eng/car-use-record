@@ -1020,9 +1020,10 @@ body {
 /* ==========================================================================
    行動裝置 (手機/平板) 響應式適配 RWD Styles
    ========================================================================== */
-/* 手機專用固定懸浮按鈕 */
-.mobile-floating-btn {
-  display: none;
+/* 手機專用元件 (電腦版預設隱藏) */
+.mobile-floating-btn,
+.mobile-scroll-hint {
+  display: none !important;
 }
 
 @media (max-width: 768px) {
@@ -1078,7 +1079,7 @@ body {
 
   /* 手機橫向滑動提示標籤 */
   .mobile-scroll-hint {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
@@ -1111,7 +1112,7 @@ body {
 
   /* 手機專用右下角懸浮簽到按鈕 */
   .mobile-floating-btn {
-    display: flex;
+    display: flex !important;
     align-items: center;
     gap: 0.5rem;
     position: fixed;

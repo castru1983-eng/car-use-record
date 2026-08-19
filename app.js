@@ -6,11 +6,11 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v6';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v6';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v6';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v6';
-const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v6';
+const STORAGE_KEY_RECORDS = 'car_records_db_v7';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v7';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v7';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v7';
+const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v7';
 
 const DEFAULT_PERSONNEL = [
   { id: 'p1', name: '林大為', department: '總務課' },
@@ -94,6 +94,18 @@ function generateMockSignature(name) {
   return canvas.toDataURL('image/png');
 }
 
+// 乘客字串與陣列安全轉化輔助函式 (避免字串 .join 報錯)
+function formatPassengers(passengers) {
+  if (!passengers) return '';
+  if (Array.isArray(passengers)) {
+    return passengers.filter(p => p && String(p).trim() !== '').join(', ');
+  }
+  if (typeof passengers === 'string') {
+    return passengers.trim();
+  }
+  return String(passengers);
+}
+
 // 預設示範簽到紀錄 (若 LocalStorage 為空時注入)
 function getMockRecords() {
   const today = new Date();
@@ -126,7 +138,7 @@ function getMockRecords() {
       totalKm: 90,
       status: 'COMPLETED', // 已歸還
       fuelStatus: '滿油/滿電 (100%)',
-      passengers: '張課長、陳專員',
+      passengers: ['張課長', '陳專員'],
       signature: generateMockSignature('林大為'),
       notes: '車輛正常，油箱已加滿'
     },
@@ -146,7 +158,7 @@ function getMockRecords() {
       totalKm: 0,
       status: 'ACTIVE', // 出勤中
       fuelStatus: '',
-      passengers: '李經理',
+      passengers: ['李經理'],
       signature: generateMockSignature('陳靜宜'),
       notes: ''
     },
@@ -166,7 +178,7 @@ function getMockRecords() {
       totalKm: 0,
       status: 'RESERVED', // 預約中
       fuelStatus: '',
-      passengers: '王工程師',
+      passengers: ['王工程師'],
       signature: generateMockSignature('張明哲'),
       notes: '需使用行車紀錄器'
     }
@@ -400,7 +412,8 @@ function renderCalendar() {
       }
 
       const driverText = rec.driver ? `<div style="font-size:0.75rem; color:#334155; font-weight:600;"><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> ${rec.driver}</div>` : '';
-      const passengersText = (rec.passengers && rec.passengers.length > 0) ? `<div style="font-size:0.72rem; color:#64748b;"><i class="fa-solid fa-users"></i> 乘客: ${rec.passengers.join(', ')}</div>` : '';
+      const pStr = formatPassengers(rec.passengers);
+      const passengersText = pStr ? `<div style="font-size:0.72rem; color:#64748b;"><i class="fa-solid fa-users"></i> 乘客: ${pStr}</div>` : '';
 
       badgesHtml += `
         <div class="record-tag ${shiftClass}" data-record-id="${rec.id}">
@@ -1218,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.getElementById('detailSignatureImg').src = rec.signature || '';
-    const passengersStr = (rec.passengers && rec.passengers.length > 0) ? rec.passengers.join(', ') : '無同行乘客';
+    const passengersStr = formatPassengers(rec.passengers) || '無同行乘客';
     document.getElementById('detailNoteBox').innerHTML = `
       <div style="margin-bottom: 0.4rem;"><strong>🚘 駕駛人員：</strong> <span style="color: var(--primary-color); font-weight: 700;">${rec.driver || '未指定'}</span></div>
       <div style="margin-bottom: 0.4rem;"><strong>👥 同行乘客：</strong> <span style="color: #475569;">${passengersStr}</span></div>
