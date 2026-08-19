@@ -6,11 +6,11 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v7';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v7';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v7';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v7';
-const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v7';
+const STORAGE_KEY_RECORDS = 'car_records_db_v8';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v8';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v8';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v8';
+const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v8';
 
 const DEFAULT_PERSONNEL = [
   { id: 'p1', name: '林大為' },
@@ -917,7 +917,9 @@ function renderMaintenance() {
 class SignaturePadEngine {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
+    if (!this.ctx) return;
     this.isDrawing = false;
     this.strokeColor = '#0f172a';
     this.lineWidth = 3;
@@ -928,6 +930,7 @@ class SignaturePadEngine {
   }
 
   initCanvas() {
+    if (!this.canvas || !this.ctx) return;
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.strokeStyle = this.strokeColor;
@@ -937,17 +940,20 @@ class SignaturePadEngine {
   }
 
   setStrokeColor(color) {
+    if (!this.ctx) return;
     this.strokeColor = color;
     this.ctx.strokeStyle = color;
   }
 
   clear() {
+    if (!this.canvas || !this.ctx) return;
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.hasDrawn = false;
   }
 
   getPos(e) {
+    if (!this.canvas) return { x: 0, y: 0 };
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
@@ -967,6 +973,8 @@ class SignaturePadEngine {
   }
 
   bindEvents() {
+    if (!this.canvas || !this.ctx) return;
+
     const start = (e) => {
       e.preventDefault();
       this.isDrawing = true;
@@ -1006,6 +1014,7 @@ class SignaturePadEngine {
   }
 
   toDataURL() {
+    if (!this.canvas) return '';
     // 若未手寫劃線，預設產生優雅提示簽名
     if (!this.hasDrawn) {
       return generateMockSignature('公務使用人');
@@ -1023,17 +1032,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // 1. 初始化資料
   loadData();
 
-  // 2. 初始化簽名 Engine
-  sigEngine = new SignaturePadEngine('signatureCanvas');
-  const embeddedSigEngine = new SignaturePadEngine('embeddedSignatureCanvas');
-
-  // 3. 首次全系統渲染
+  // 2. 首次全系統渲染
   refreshApp();
 
-  // 清除內嵌簽名板按鈕
-  document.getElementById('btnClearEmbeddedSig').addEventListener('click', () => {
-    embeddedSigEngine.clear();
-  });
+  // 3. 安全初始化簽名 Engine (若元素存在才創建)
+  if (document.getElementById('signatureCanvas')) {
+    sigEngine = new SignaturePadEngine('signatureCanvas');
+  }
 
   // ------------------------------------------------------------------------
   // A. 分頁切換 (Tabs) 與預設開啟頁面控制
