@@ -6,11 +6,11 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v8';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v8';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v8';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v8';
-const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v8';
+const STORAGE_KEY_RECORDS = 'car_records_db_v9';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v9';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v9';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v9';
+const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v9';
 
 const DEFAULT_PERSONNEL = [
   { id: 'p1', name: '林大為' },
@@ -658,14 +658,22 @@ function renderFuelCardManagement() {
     const amtStr = isTopUp ? `+ NT$ ${tx.amount.toLocaleString()}` : `- NT$ ${tx.amount.toLocaleString()}`;
     const amtColor = isTopUp ? '#059669' : '#dc2626';
 
+    const mileageDisplay = tx.mileage ? `${Number(tx.mileage).toLocaleString()} km` : '-';
+    
+    let personNoteDisplay = `<div style="font-weight:700; color:#1e293b;"><i class="fa-solid fa-user-circle" style="color:var(--primary-color);"></i> ${tx.person || '未紀錄人員'}</div>`;
+    if (tx.note) {
+      personNoteDisplay += `<div style="font-size:0.78rem; color:#64748b;">${tx.note}</div>`;
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><div style="font-weight:700;">${tx.date}</div></td>
       <td>${carInfo}</td>
       <td>${typeBadge}</td>
       <td><span style="font-weight:700; color:${amtColor};">${amtStr}</span></td>
+      <td><span style="font-weight:600; color:#334155;">${mileageDisplay}</span></td>
       <td><strong>NT$ ${(tx.balanceAfter || 0).toLocaleString()}</strong></td>
-      <td><div style="font-size:0.85rem; color:#334155;">${tx.note || '無'}</div></td>
+      <td>${personNoteDisplay}</td>
       <td style="text-align: right;">
         <button class="btn btn-icon btn-delete-fuel-tx" data-id="${tx.id}" title="刪除此筆交易">
           <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
@@ -1334,6 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // F. 車輛管理 Modal 控制
   // ------------------------------------------------------------------------
   const modalVehicle = document.getElementById('modalVehicle');
+
   const formVehicle = document.getElementById('formVehicle');
 
   const btnOpenVeh = document.getElementById('btnOpenAddVehicle');
@@ -1436,14 +1445,50 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFuelTxModal = (txId = '', presetCarId = '') => {
     if (!formFuelTx || !modalFuelTx) return;
     formFuelTx.reset();
-    document.getElementById('fuelTxEditId').value = '';
+    document.getElementById('fuelTxEditId').value = txId;
 
-    // 填入車輛選單
     const selectCar = document.getElementById('fuelTxCarId');
     selectCar.innerHTML = '';
     state.vehicles.forEach(v => {
       selectCar.innerHTML += `<option value="${v.id}" ${presetCarId === v.id ? 'selected' : ''}>${v.plate} - ${v.model} (${v.fuelCardNo || '未綁卡'})</option>`;
     });
+
+    const personSelect = document.getElementById('fuelTxPersonSelect');
+    if (personSelect) {
+      personSelect.innerHTML = '';
+      state.personnel.forEach(p => {
+        personSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+      });
+    }
+
+    const updateCarDefaults = () => {
+      const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
+      if (selectedCar) {
+        document.getElementById('fuelTxMileage').value = selectedCar.mileage || '';
+        calculateBalance();
+      }
+    };
+
+    const calculateBalance = () => {
+      const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
+      const currentBal = selectedCar ? (selectedCar.fuelCardBalance || 0) : 0;
+      const type = document.getElementById('fuelTxType').value;
+      const amount = parseInt(document.getElementById('fuelTxAmount').value) || 0;
+
+      let estBalance = currentBal;
+      if (type === 'TOPUP') {
+        estBalance = currentBal + amount;
+      } else {
+        estBalance = currentBal - amount;
+      }
+      document.getElementById('fuelTxBalanceAfter').value = estBalance;
+    };
+
+    updateCarDefaults();
+
+    selectCar.onchange = updateCarDefaults;
+    document.getElementById('fuelTxType').onchange = calculateBalance;
+    document.getElementById('fuelTxAmount').oninput = calculateBalance;
 
     const now = new Date();
     const year = now.getFullYear();
@@ -1483,6 +1528,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const carId = document.getElementById('fuelTxCarId').value;
       const type = document.getElementById('fuelTxType').value;
       const amount = parseInt(document.getElementById('fuelTxAmount').value) || 0;
+      const mileage = parseInt(document.getElementById('fuelTxMileage').value) || 0;
+      const balanceAfter = parseInt(document.getElementById('fuelTxBalanceAfter').value) || 0;
+      const person = document.getElementById('fuelTxPersonSelect').value || (state.personnel[0] ? state.personnel[0].name : '駕駛同仁');
       const rawDate = document.getElementById('fuelTxDate').value;
       const date = rawDate.replace('T', ' ');
       const note = document.getElementById('fuelTxNote').value.trim();
@@ -1493,22 +1541,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      let currentBal = vehicle.fuelCardBalance || 0;
-      let newBalance = currentBal;
-      if (type === 'TOPUP') {
-        newBalance = currentBal + amount;
-      } else {
-        newBalance = currentBal - amount;
+      vehicle.fuelCardBalance = balanceAfter;
+      if (mileage > (vehicle.mileage || 0)) {
+        vehicle.mileage = mileage;
       }
-      vehicle.fuelCardBalance = newBalance;
 
       const newTx = {
         id: 'ft-' + Date.now(),
         carId: carId,
         type: type,
         amount: amount,
+        mileage: mileage,
+        balanceAfter: balanceAfter,
+        person: person,
         date: date,
-        balanceAfter: newBalance,
         note: note
       };
 

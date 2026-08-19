@@ -285,9 +285,10 @@
                 <th>交易時間</th>
                 <th>車輛 / 油卡卡號</th>
                 <th>異動類別</th>
-                <th>金額</th>
-                <th>異動後餘額</th>
-                <th>加油站 / 經手人 / 備註</th>
+                <th>加油金額</th>
+                <th>加油里程</th>
+                <th>剩餘金額</th>
+                <th>加油人員 / 備註</th>
                 <th style="text-align: right;">操作</th>
               </tr>
             </thead>
@@ -643,8 +644,18 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">金額 (NT$) <span class="required">*</span></label>
+            <label class="form-label">加油時里程數 (km)</label>
+            <input type="number" class="input-control" id="fuelTxMileage" placeholder="例：42850" min="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">加油金額 (NT$) <span class="required">*</span></label>
             <input type="number" class="input-control" id="fuelTxAmount" placeholder="例：1500" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">剩餘金額 (卡片餘額 NT$)</label>
+            <input type="number" class="input-control" id="fuelTxBalanceAfter" placeholder="例：3500">
           </div>
 
           <div class="form-group">
@@ -653,8 +664,15 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">加油站名 / 經手人 / 發票備註</label>
-            <input type="text" class="input-control" id="fuelTxNote" placeholder="例：台灣中油西屯站 / 駕駛：林大為 / 發票：AB12345678">
+            <label class="form-label">加油人員 <span class="required">*</span></label>
+            <select class="select-control" id="fuelTxPersonSelect" required>
+              <!-- 動態載入同仁選單 -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">加油站名 / 發票備註 (選填)</label>
+            <input type="text" class="input-control" id="fuelTxNote" placeholder="例：台灣中油西屯站 / 發票：AB12345678">
           </div>
         </div>
 
@@ -781,6 +799,6 @@
   </button>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
