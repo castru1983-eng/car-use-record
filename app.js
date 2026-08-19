@@ -970,6 +970,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btnOpenNewRecord').addEventListener('click', () => openRecordModal());
 
+  // 手機專用右下角懸浮按鈕點擊觸發簽到
+  const mobileFloatingBtn = document.getElementById('mobileFloatingAddBtn');
+  if (mobileFloatingBtn) {
+    mobileFloatingBtn.addEventListener('click', () => openRecordModal());
+  }
+
   // 點擊日曆格任何位置或 "+" 號皆觸發手寫簽名彈窗
   document.addEventListener('click', (e) => {
     const addBtn = e.target.closest('.btn-add-quick');

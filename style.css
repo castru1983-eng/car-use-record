@@ -971,6 +971,11 @@ body {
 /* ==========================================================================
    行動裝置 (手機/平板) 響應式適配 RWD Styles
    ========================================================================== */
+/* 手機專用固定懸浮按鈕 */
+.mobile-floating-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .navbar {
     padding: 0.75rem 1rem;
@@ -997,7 +1002,24 @@ body {
   }
 
   .toolbar {
-    padding: 0.75rem;
+    padding: 0.85rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .toolbar-left, .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-right #btnOpenNewRecord {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   }
 
   .month-navigator {
@@ -1007,6 +1029,51 @@ body {
 
   .calendar-days-grid {
     grid-auto-rows: minmax(95px, 1fr);
+  }
+
+  /* 手機專用右下角懸浮簽到按鈕 */
+  .mobile-floating-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: fixed;
+    bottom: 1.75rem;
+    right: 1.25rem;
+    z-index: 99;
+    background: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 999px;
+    padding: 0.75rem 1.35rem;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 6px 22px rgba(37, 99, 235, 0.5);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .mobile-floating-btn:active {
+    transform: scale(0.94);
+  }
+
+  /* 手機簽到彈窗觸控大目標適配 */
+  .modal-card {
+    width: 94vw !important;
+    max-width: 94vw !important;
+    padding: 1.1rem !important;
+    margin: 0.5rem !important;
+  }
+
+  .shift-chip {
+    flex: 1;
+    padding: 0.65rem 1rem !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    justify-content: center;
+  }
+
+  .signature-canvas {
+    height: 160px;
   }
 }
 
