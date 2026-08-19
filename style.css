@@ -965,6 +965,54 @@ body {
 .vehicle-status-tag.available { background: #d1fae5; color: #047857; }
 .vehicle-status-tag.in-use { background: #dbeafe; color: #1d4ed8; }
 
+/* 乘客多選晶片 (Passenger Chips) */
+.passenger-chip {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.passenger-chip:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: #f0f9ff;
+}
+
+.passenger-chip.selected {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+  font-weight: 700;
+}
+
+/* 人員卡片 (Personnel Card) */
+.personnel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-fast);
+}
+
+.personnel-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
 /* 隱藏區塊 Helper */
 .hidden {
   display: none !important;

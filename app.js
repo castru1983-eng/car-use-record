@@ -6,10 +6,26 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v5';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v5';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v5';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v5';
+const STORAGE_KEY_RECORDS = 'car_records_db_v6';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v6';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v6';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v6';
+const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v6';
+
+const DEFAULT_PERSONNEL = [
+  { id: 'p1', name: '林大為', department: '總務課' },
+  { id: 'p2', name: '陳靜宜', department: '業務二組' },
+  { id: 'p3', name: '張明哲', department: '資訊處' },
+  { id: 'p4', name: '袁', department: '勤休組' },
+  { id: 'p5', name: '波', department: '勤休組' },
+  { id: 'p6', name: 'G', department: '勤務組' },
+  { id: 'p7', name: '治', department: '勤務組' },
+  { id: 'p8', name: '祿', department: '勤務組' },
+  { id: 'p9', name: '明', department: '勤務組' },
+  { id: 'p10', name: '放', department: '勤務組' },
+  { id: 'p11', name: '祥', department: '勤務組' },
+  { id: 'p12', name: '升', department: '勤務組' }
+];
 
 const state = {
   currentDate: new Date(), // 當前月曆檢視的基準日期
@@ -22,7 +38,8 @@ const state = {
   records: [],
   vehicles: [],
   maintenanceRecords: [],
-  fuelTransactions: []
+  fuelTransactions: [],
+  personnel: []
 };
 
 // 來自「公務車事件紀錄.xlsx」之歷史保養與事件數據 (含待處理任務)
@@ -219,6 +236,18 @@ function loadData() {
     state.fuelTransactions = EXCEL_IMPORTED_FUEL_TRANSACTIONS;
     saveFuelTransactions();
   }
+
+  const localPersonnel = localStorage.getItem(STORAGE_KEY_PERSONNEL);
+  if (localPersonnel) {
+    state.personnel = JSON.parse(localPersonnel);
+  } else {
+    state.personnel = DEFAULT_PERSONNEL;
+    savePersonnel();
+  }
+}
+
+function savePersonnel() {
+  localStorage.setItem(STORAGE_KEY_PERSONNEL, JSON.stringify(state.personnel));
 }
 
 function saveFuelTransactions() {
@@ -370,11 +399,16 @@ function renderCalendar() {
         shiftIcon = '🌙';
       }
 
+      const driverText = rec.driver ? `<div style="font-size:0.75rem; color:#334155; font-weight:600;"><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> ${rec.driver}</div>` : '';
+      const passengersText = (rec.passengers && rec.passengers.length > 0) ? `<div style="font-size:0.72rem; color:#64748b;"><i class="fa-solid fa-users"></i> 乘客: ${rec.passengers.join(', ')}</div>` : '';
+
       badgesHtml += `
         <div class="record-tag ${shiftClass}" data-record-id="${rec.id}">
           <div class="record-tag-header">
             <span class="record-tag-car">${rec.plate} (${shiftIcon} ${shiftName})</span>
           </div>
+          ${driverText}
+          ${passengersText}
           ${rec.signature ? `<img src="${rec.signature}" class="record-signature-img" alt="手寫簽名">` : ''}
           ${rec.notes ? `<div class="record-note-badge" title="${rec.notes}"><i class="fa-solid fa-note-sticky"></i> ${rec.notes}</div>` : ''}
         </div>
@@ -616,6 +650,86 @@ function renderFuelCardManagement() {
   });
 }
 
+// (D.3) 渲染出勤同仁與常用人員名單 (Personnel Management)
+function renderPersonnel() {
+  const container = document.getElementById('personnelGrid');
+  const textCount = document.getElementById('personnelCountText');
+  if (textCount) textCount.innerText = state.personnel.length;
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (state.personnel.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 1.5rem;">
+        <i class="fa-solid fa-users-slash" style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--text-light); display: block;"></i>
+        尚無登錄常用人員，請點擊上方按鈕新增同仁名單
+      </div>
+    `;
+    return;
+  }
+
+  state.personnel.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'personnel-card';
+    card.innerHTML = `
+      <div>
+        <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
+          <i class="fa-solid fa-user-circle" style="color: var(--primary-color);"></i> ${p.name}
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
+          ${p.department || '一般同仁'}
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.25rem;">
+        <button class="btn btn-icon btn-edit-personnel" data-id="${p.id}" title="編輯資料">
+          <i class="fa-solid fa-pen" style="font-size: 0.8rem;"></i>
+        </button>
+        <button class="btn btn-icon btn-delete-personnel" data-id="${p.id}" title="刪除此同仁">
+          <i class="fa-solid fa-trash" style="color: var(--danger-color); font-size: 0.8rem;"></i>
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// 填入簽到 Modal 中的駕駛下拉選項與同行乘客多選晶片
+function populateDriverAndPassengerOptions(selectedDriver = '', selectedPassengers = []) {
+  const driverSelect = document.getElementById('formDriverSelect');
+  const passengerContainer = document.getElementById('passengerChipsContainer');
+
+  if (driverSelect) {
+    driverSelect.innerHTML = '';
+    state.personnel.forEach(p => {
+      const isSelected = selectedDriver ? (p.name === selectedDriver) : false;
+      driverSelect.innerHTML += `<option value="${p.name}" ${isSelected ? 'selected' : ''}>${p.name} (${p.department || '同仁'})</option>`;
+    });
+  }
+
+  if (passengerContainer) {
+    passengerContainer.innerHTML = '';
+    state.personnel.forEach(p => {
+      const isSelected = selectedPassengers.includes(p.name);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `passenger-chip ${isSelected ? 'selected' : ''}`;
+      chip.setAttribute('data-name', p.name);
+      chip.innerHTML = `<i class="fa-solid ${isSelected ? 'fa-square-check' : 'fa-square'}"></i> ${p.name}`;
+      
+      chip.addEventListener('click', () => {
+        const currentlySelected = chip.classList.contains('selected');
+        chip.classList.toggle('selected', !currentlySelected);
+        const icon = chip.querySelector('i');
+        if (icon) {
+          icon.className = `fa-solid ${!currentlySelected ? 'fa-square-check' : 'fa-square'}`;
+        }
+      });
+
+      passengerContainer.appendChild(chip);
+    });
+  }
+}
+
 // 刷新全系統介面
 function refreshApp() {
   updateMetrics();
@@ -623,6 +737,7 @@ function refreshApp() {
   renderTable();
   renderVehicles();
   renderFuelCardManagement();
+  renderPersonnel();
   renderMaintenance();
 }
 
@@ -964,6 +1079,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 預設車輛為 v1
     document.getElementById('formCarId').value = state.vehicles[0] ? state.vehicles[0].id : 'v1';
 
+    // 填入駕駛與同行乘客選單
+    populateDriverAndPassengerOptions();
+
     embeddedSigEngine.clear();
     modalRecord.classList.add('active');
   };
@@ -1007,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     b.addEventListener('click', () => modalRecord.classList.remove('active'));
   });
 
-  // 提交簽到表單 (包含早/晚班與備註)
+  // 提交簽到表單 (包含早/晚班、駕駛、乘客與備註)
   formRecord.addEventListener('submit', (e) => {
     e.preventDefault();
 
@@ -1024,13 +1142,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const noteText = noteInput ? noteInput.value.trim() : '';
     const shiftVal = document.getElementById('formShift').value || '早班';
 
+    const driverSelect = document.getElementById('formDriverSelect');
+    const driverVal = driverSelect ? driverSelect.value : '未填駕駛';
+
+    const selectedPassengerChips = document.querySelectorAll('#passengerChipsContainer .passenger-chip.selected');
+    const passengersArr = Array.from(selectedPassengerChips).map(c => c.getAttribute('data-name'));
+
     const newRecord = {
       id: 'rec-' + Date.now(),
       carId: carId,
       plate: vehicle ? vehicle.plate : 'ABC-1234',
       date: document.getElementById('formDate').value,
       shift: shiftVal,
-      driver: '已簽名使用人',
+      driver: driverVal,
+      passengers: passengersArr,
       department: '',
       noteQuick: noteText,
       startTime: shiftVal === '早班' ? '08:00' : '17:00',
@@ -1093,7 +1218,12 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.getElementById('detailSignatureImg').src = rec.signature || '';
-    document.getElementById('detailNoteBox').innerText = rec.notes || rec.destination || '無特別備註';
+    const passengersStr = (rec.passengers && rec.passengers.length > 0) ? rec.passengers.join(', ') : '無同行乘客';
+    document.getElementById('detailNoteBox').innerHTML = `
+      <div style="margin-bottom: 0.4rem;"><strong>🚘 駕駛人員：</strong> <span style="color: var(--primary-color); font-weight: 700;">${rec.driver || '未指定'}</span></div>
+      <div style="margin-bottom: 0.4rem;"><strong>👥 同行乘客：</strong> <span style="color: #475569;">${passengersStr}</span></div>
+      <div style="margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px dashed var(--border-color);"><strong>📝 特別備註：</strong> ${rec.notes || rec.destination || '無特別備註'}</div>
+    `;
 
     modalDetail.classList.add('active');
   };
@@ -1343,6 +1473,88 @@ document.addEventListener('DOMContentLoaded', () => {
       if (confirm('確定要刪除這筆油卡交易紀錄嗎？')) {
         state.fuelTransactions = state.fuelTransactions.filter(tx => tx.id !== id);
         saveFuelTransactions();
+        refreshApp();
+      }
+    }
+  });
+
+  // ------------------------------------------------------------------------
+  // F.3 出勤同仁與常用人員名單 Modal 控制
+  // ------------------------------------------------------------------------
+  const modalPersonnel = document.getElementById('modalPersonnel');
+  const formPersonnel = document.getElementById('formPersonnel');
+
+  const btnOpenPersonnel = document.getElementById('btnOpenAddPersonnel');
+  if (btnOpenPersonnel && formPersonnel) {
+    btnOpenPersonnel.addEventListener('click', () => {
+      formPersonnel.reset();
+      document.getElementById('personnelEditId').value = '';
+      document.getElementById('modalPersonnelTitle').innerText = '新增常用同仁資料';
+      modalPersonnel.classList.add('active');
+    });
+  }
+
+  const btnClosePersonnel = document.getElementById('btnClosePersonnelModal');
+  if (btnClosePersonnel && modalPersonnel) btnClosePersonnel.addEventListener('click', () => modalPersonnel.classList.remove('active'));
+
+  const btnCancelPersonnel = document.getElementById('btnCancelPersonnel');
+  if (btnCancelPersonnel && modalPersonnel) btnCancelPersonnel.addEventListener('click', () => modalPersonnel.classList.remove('active'));
+
+  if (formPersonnel) {
+    formPersonnel.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const editId = document.getElementById('personnelEditId').value;
+      const name = document.getElementById('personnelName').value.trim();
+      const department = document.getElementById('personnelDepartment').value.trim();
+
+      if (!name) {
+        alert('請輸入同仁姓名或簡稱');
+        return;
+      }
+
+      if (editId) {
+        const p = state.personnel.find(item => item.id === editId);
+        if (p) {
+          p.name = name;
+          p.department = department;
+        }
+      } else {
+        const newP = {
+          id: 'p-' + Date.now(),
+          name: name,
+          department: department
+        };
+        state.personnel.push(newP);
+      }
+
+      savePersonnel();
+      refreshApp();
+      modalPersonnel.classList.remove('active');
+    });
+  }
+
+  // 編輯與刪除人員按鈕點擊監聽
+  document.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.btn-edit-personnel');
+    if (editBtn) {
+      const id = editBtn.getAttribute('data-id');
+      const p = state.personnel.find(item => item.id === id);
+      if (p) {
+        document.getElementById('personnelEditId').value = p.id;
+        document.getElementById('personnelName').value = p.name;
+        document.getElementById('personnelDepartment').value = p.department || '';
+        document.getElementById('modalPersonnelTitle').innerText = '編輯常用同仁資料';
+        modalPersonnel.classList.add('active');
+      }
+    }
+
+    const delBtn = e.target.closest('.btn-delete-personnel');
+    if (delBtn) {
+      const id = delBtn.getAttribute('data-id');
+      if (confirm('確定要移除這位同仁嗎？移除後將不影響過去已簽到的歷史紀錄。')) {
+        state.personnel = state.personnel.filter(p => p.id !== id);
+        savePersonnel();
         refreshApp();
       }
     }

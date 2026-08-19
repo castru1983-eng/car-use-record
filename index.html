@@ -297,9 +297,73 @@
           </table>
         </div>
       </div>
+
+      <!-- 出勤同仁與常用人員名單管理專區 -->
+      <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem; margin-top: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-users" style="color: var(--primary-color);"></i> 車隊出勤同仁與常用人員名單管理
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+              管理系統中供【簽到駕駛】與【同行乘客】可勾選的常用同仁名單（共 <span id="personnelCountText" style="font-weight: 700; color: var(--primary-color);">0</span> 位同仁）
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-primary" id="btnOpenAddPersonnel">
+              <i class="fa-solid fa-user-plus"></i> 新增常用同仁/駕駛
+            </button>
+          </div>
+        </div>
+
+        <!-- 人員卡片 Grid -->
+        <div id="personnelGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem;">
+          <!-- 動態載入人員卡片 -->
+        </div>
+      </div>
     </section>
 
   </main>
+
+  <!-- ==========================================================================
+       彈窗 Modal 4.8: 新增 / 編輯常用同仁名單彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalPersonnel">
+    <div class="modal-card" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalPersonnelTitle">
+          <i class="fa-solid fa-user-plus" style="color: var(--primary-color);"></i> 新增常用同仁資料
+        </h3>
+        <button class="btn-close-modal" id="btnClosePersonnelModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formPersonnel">
+        <input type="hidden" id="personnelEditId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">同仁姓名 / 簡稱 <span class="required">*</span></label>
+            <input type="text" class="input-control" id="personnelName" placeholder="例：林大為 或 波、G" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">所屬部門 / 組別</label>
+            <input type="text" class="input-control" id="personnelDepartment" placeholder="例：總務課、勤休組">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelPersonnel">取消</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk"></i> 儲存同仁資料
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ==========================================================================
        彈窗 Modal 1: 支援「早班 / 晚班」與「特別備註」之手寫簽到彈窗
@@ -343,7 +407,28 @@
             </div>
           </div>
 
-          <!-- 2. 特別備註 (Optional Note) -->
+          <!-- 2. 駕駛人員 (Driver) -->
+          <div>
+            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
+              <i class="fa-solid fa-id-card"></i> 🚘 主駕駛人員：
+            </label>
+            <select class="select-control" id="formDriverSelect" style="width: 100%; font-size: 0.88rem; padding: 0.45rem 0.75rem;">
+              <!-- 動態載入駕駛選項 -->
+            </select>
+          </div>
+
+          <!-- 3. 同行乘客 (Passengers) 多選勾選區 -->
+          <div>
+            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-users"></i> 👥 同行乘客 (可多選勾選)：</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">點擊可多選/取消</span>
+            </label>
+            <div id="passengerChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.4rem; background: var(--bg-main); padding: 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); max-height: 120px; overflow-y: auto;">
+              <!-- 動態載入乘客多選晶片 -->
+            </div>
+          </div>
+
+          <!-- 4. 特別備註 (Optional Note) -->
           <div>
             <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
               <i class="fa-solid fa-comment-dots"></i> 特別備註 (選填)：
@@ -716,6 +801,6 @@
   </button>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
