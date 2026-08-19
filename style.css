@@ -305,7 +305,8 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
 }
@@ -1027,8 +1028,37 @@ body {
     justify-content: space-between;
   }
 
+  /* 手機橫向滑動提示標籤 */
+  .mobile-scroll-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    padding: 0.45rem 0.85rem;
+    border-radius: var(--radius-md);
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+    text-align: center;
+  }
+
+  /* 手機端日曆容器滑動防護 */
+  .calendar-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-md);
+  }
+
+  .calendar-header-grid,
   .calendar-days-grid {
-    grid-auto-rows: minmax(95px, 1fr);
+    min-width: 720px !important; /* 確保 7 個星期欄位完整展開不擠壓，可在手機上順暢左右滑動 */
+  }
+
+  .calendar-days-grid {
+    grid-auto-rows: minmax(100px, 1fr);
   }
 
   /* 手機專用右下角懸浮簽到按鈕 */
