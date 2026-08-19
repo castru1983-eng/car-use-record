@@ -1138,7 +1138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 填入駕駛與同行乘客選單
     populateDriverAndPassengerOptions();
 
-    embeddedSigEngine.clear();
     modalRecord.classList.add('active');
   };
 
@@ -1188,12 +1187,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const carId = document.getElementById('formCarId').value;
     const vehicle = state.vehicles.find(v => v.id === carId);
 
-    const sigData = embeddedSigEngine.toDataURL();
-    if (!sigData) {
-      alert('請先在手寫區域進行電子簽名！');
-      return;
-    }
-
     const noteInput = document.getElementById('formNoteQuick');
     const noteText = noteInput ? noteInput.value.trim() : '';
     const shiftVal = document.getElementById('formShift').value || '早班';
@@ -1223,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
       endMileage: null,
       totalKm: 0,
       status: 'ACTIVE',
-      signature: sigData,
+      signature: '',
       notes: noteText
     };
 

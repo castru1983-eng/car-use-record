@@ -431,28 +431,12 @@
             </label>
             <input type="text" class="input-control" id="formNoteQuick" placeholder="例：台中出差、洗車加油、維修保養..." style="padding: 0.45rem 0.75rem; font-size: 0.88rem;">
           </div>
-
-          <!-- 3. 直接手寫簽名板區域 -->
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-              <label class="form-label" style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-main);">
-                ✍️ 手寫電子簽名 <span class="required">*</span>
-              </label>
-              <button type="button" class="btn btn-secondary" id="btnClearEmbeddedSig" style="padding: 0.18rem 0.55rem; font-size: 0.78rem;">
-                <i class="fa-solid fa-eraser"></i> 重簽
-              </button>
-            </div>
-
-            <div class="signature-pad-container" style="border: 2px solid var(--primary-color); border-radius: var(--radius-md);">
-              <canvas id="embeddedSignatureCanvas" class="signature-canvas" width="430" height="170"></canvas>
-            </div>
-          </div>
         </div>
 
         <div class="modal-footer" style="padding: 0.85rem 1.25rem;">
           <button type="button" class="btn btn-secondary btnCloseRecordModal">取消</button>
           <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.4rem; font-size: 1rem; font-weight: 700; background: var(--accent-color);">
-            <i class="fa-solid fa-signature"></i> 簽名完成
+            <i class="fa-solid fa-check"></i> 確認出車 / 儲存簽到
           </button>
         </div>
       </form>
@@ -797,6 +781,6 @@
   </button>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
