@@ -407,14 +407,15 @@
             </div>
           </div>
 
-          <!-- 2. 駕駛人員 (Driver) -->
+          <!-- 2. 主駕駛人員 (Driver - 可多選勾選) -->
           <div>
-            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
-              <i class="fa-solid fa-id-card"></i> 🚘 主駕駛人員：
+            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-id-card"></i> 🚘 主駕駛人員 (可多選勾選)：</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">點擊可多選/取消</span>
             </label>
-            <select class="select-control" id="formDriverSelect" style="width: 100%; font-size: 0.88rem; padding: 0.45rem 0.75rem;">
-              <!-- 動態載入駕駛選項 -->
-            </select>
+            <div id="driverChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.4rem; background: var(--bg-main); padding: 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); max-height: 120px; overflow-y: auto;">
+              <!-- 動態載入駕駛多選晶片 -->
+            </div>
           </div>
 
           <!-- 3. 同行乘客 (Passengers) 多選勾選區 -->
@@ -801,6 +802,6 @@
   </button>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

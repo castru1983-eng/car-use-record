@@ -94,6 +94,18 @@ function generateMockSignature(name) {
   return canvas.toDataURL('image/png');
 }
 
+// 駕駛人員字串與陣列安全轉化輔助函式
+function formatDrivers(driver) {
+  if (!driver) return '';
+  if (Array.isArray(driver)) {
+    return driver.filter(d => d && String(d).trim() !== '').join(', ');
+  }
+  if (typeof driver === 'string') {
+    return driver.trim();
+  }
+  return String(driver);
+}
+
 // 乘客字串與陣列安全轉化輔助函式 (避免字串 .join 報錯)
 function formatPassengers(passengers) {
   if (!passengers) return '';
@@ -411,7 +423,8 @@ function renderCalendar() {
         shiftIcon = '🌙';
       }
 
-      const driverText = rec.driver ? `<div style="font-size:0.75rem; color:#334155; font-weight:600;"><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> ${rec.driver}</div>` : '';
+      const dStr = formatDrivers(rec.driver);
+      const driverText = dStr ? `<div style="font-size:0.75rem; color:#334155; font-weight:600;"><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> ${dStr}</div>` : '';
       const pStr = formatPassengers(rec.passengers);
       const passengersText = pStr ? `<div style="font-size:0.72rem; color:#64748b;"><i class="fa-solid fa-users"></i> 乘客: ${pStr}</div>` : '';
 
@@ -706,23 +719,56 @@ function renderPersonnel() {
   });
 }
 
-// 填入簽到 Modal 中的駕駛下拉選項與同行乘客多選晶片
-function populateDriverAndPassengerOptions(selectedDriver = '', selectedPassengers = []) {
-  const driverSelect = document.getElementById('formDriverSelect');
+// 填入簽到 Modal 中的主駕駛與同行乘客多選晶片
+function populateDriverAndPassengerOptions(selectedDrivers = [], selectedPassengers = []) {
+  const driverContainer = document.getElementById('driverChipsContainer');
   const passengerContainer = document.getElementById('passengerChipsContainer');
 
-  if (driverSelect) {
-    driverSelect.innerHTML = '';
-    state.personnel.forEach(p => {
-      const isSelected = selectedDriver ? (p.name === selectedDriver) : false;
-      driverSelect.innerHTML += `<option value="${p.name}" ${isSelected ? 'selected' : ''}>${p.name} (${p.department || '同仁'})</option>`;
+  // 駕駛名單純化
+  let driverList = [];
+  if (Array.isArray(selectedDrivers)) {
+    driverList = selectedDrivers;
+  } else if (typeof selectedDrivers === 'string' && selectedDrivers.trim() !== '') {
+    driverList = [selectedDrivers.trim()];
+  }
+
+  // 乘客名單純化
+  let passengerList = [];
+  if (Array.isArray(selectedPassengers)) {
+    passengerList = selectedPassengers;
+  } else if (typeof selectedPassengers === 'string' && selectedPassengers.trim() !== '') {
+    passengerList = [selectedPassengers.trim()];
+  }
+
+  // 1. 渲染主駕駛多選晶片
+  if (driverContainer) {
+    driverContainer.innerHTML = '';
+    state.personnel.forEach((p, idx) => {
+      const isSelected = (driverList.length > 0) ? driverList.includes(p.name) : (idx === 0);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `passenger-chip driver-chip ${isSelected ? 'selected' : ''}`;
+      chip.setAttribute('data-name', p.name);
+      chip.innerHTML = `<i class="fa-solid ${isSelected ? 'fa-square-check' : 'fa-square'}"></i> ${p.name}`;
+      
+      chip.addEventListener('click', () => {
+        const currentlySelected = chip.classList.contains('selected');
+        chip.classList.toggle('selected', !currentlySelected);
+        const icon = chip.querySelector('i');
+        if (icon) {
+          icon.className = `fa-solid ${!currentlySelected ? 'fa-square-check' : 'fa-square'}`;
+        }
+      });
+
+      driverContainer.appendChild(chip);
     });
   }
 
+  // 2. 渲染同行乘客多選晶片
   if (passengerContainer) {
     passengerContainer.innerHTML = '';
     state.personnel.forEach(p => {
-      const isSelected = selectedPassengers.includes(p.name);
+      const isSelected = passengerList.includes(p.name);
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = `passenger-chip ${isSelected ? 'selected' : ''}`;
@@ -1155,8 +1201,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const noteText = noteInput ? noteInput.value.trim() : '';
     const shiftVal = document.getElementById('formShift').value || '早班';
 
-    const driverSelect = document.getElementById('formDriverSelect');
-    const driverVal = driverSelect ? driverSelect.value : '未填駕駛';
+    const selectedDriverChips = document.querySelectorAll('#driverChipsContainer .driver-chip.selected');
+    const driversArr = Array.from(selectedDriverChips).map(c => c.getAttribute('data-name'));
+    const driverVal = driversArr.length > 0 ? driversArr : (state.personnel[0] ? [state.personnel[0].name] : ['未填駕駛']);
 
     const selectedPassengerChips = document.querySelectorAll('#passengerChipsContainer .passenger-chip.selected');
     const passengersArr = Array.from(selectedPassengerChips).map(c => c.getAttribute('data-name'));
@@ -1231,9 +1278,10 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.getElementById('detailSignatureImg').src = rec.signature || '';
+    const driversStr = formatDrivers(rec.driver) || '未指定駕駛';
     const passengersStr = formatPassengers(rec.passengers) || '無同行乘客';
     document.getElementById('detailNoteBox').innerHTML = `
-      <div style="margin-bottom: 0.4rem;"><strong>🚘 駕駛人員：</strong> <span style="color: var(--primary-color); font-weight: 700;">${rec.driver || '未指定'}</span></div>
+      <div style="margin-bottom: 0.4rem;"><strong>🚘 駕駛人員：</strong> <span style="color: var(--primary-color); font-weight: 700;">${driversStr}</span></div>
       <div style="margin-bottom: 0.4rem;"><strong>👥 同行乘客：</strong> <span style="color: #475569;">${passengersStr}</span></div>
       <div style="margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px dashed var(--border-color);"><strong>📝 特別備註：</strong> ${rec.notes || rec.destination || '無特別備註'}</div>
     `;
