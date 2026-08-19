@@ -42,6 +42,11 @@
         </button>
       </li>
       <li>
+        <button class="nav-btn" id="tabFuel" data-target="fuelView">
+          <i class="fa-solid fa-gas-pump"></i> 油卡與加油紀錄
+        </button>
+      </li>
+      <li>
         <button class="nav-btn" id="tabMaintenance" data-target="maintenanceView">
           <i class="fa-solid fa-wrench"></i> 車輛保養與狀況紀錄
         </button>
@@ -167,70 +172,13 @@
       </div>
     </section>
 
-    <!-- 3. 公務車保養及狀況紀錄 (Maintenance & Incident Record View) -->
-    <section id="maintenanceView" class="view-section hidden">
-      <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <h2 style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-wrench" style="color: var(--primary-color);"></i> 公務車保養及狀況紀錄
-            </h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-              已匯入「公務車事件紀錄.xlsx」之歷史維修、保養與驗車事件檔案（共 <span id="maintCountBadge" style="font-weight: 700; color: var(--primary-color);">0</span> 筆紀錄）
-            </p>
-          </div>
-
-          <div style="display: flex; gap: 0.75rem; align-items: center;">
-            <button class="btn btn-primary" id="btnOpenAddMaint">
-              <i class="fa-solid fa-plus"></i> 新增保養/事件紀錄
-            </button>
-          </div>
-        </div>
-
-        <!-- 搜尋與類別篩選列 -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; background: var(--bg-main); padding: 0.75rem; border-radius: var(--radius-md);">
-          <div style="position: relative; width: 320px;">
-            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
-            <input type="text" class="input-control" id="searchMaintInput" placeholder="搜尋保養、驗車、維修或關鍵字..." style="padding-left: 2.3rem; width: 100%;">
-          </div>
-
-          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="maintCategoryChips">
-            <button class="btn btn-secondary btn-maint-filter active" data-cat="ALL" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">全部紀錄</button>
-            <button class="btn btn-secondary btn-maint-filter" data-cat="待處理" id="btnFilterPending" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700;">
-              ⏳ 待處理 <span id="pendingCountBadge" class="pending-count-badge">0</span>
-            </button>
-            <button class="btn btn-secondary btn-maint-filter" data-cat="維修" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">🔧 維修</button>
-            <button class="btn btn-secondary btn-maint-filter" data-cat="保養" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">⚙️ 保養</button>
-            <button class="btn btn-secondary btn-maint-filter" data-cat="驗車" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">📋 驗車</button>
-          </div>
-        </div>
-
-        <!-- 歷史事件時間軸與卡片清單 Grid -->
-        <div id="maintCardList" style="display: flex; flex-direction: column; gap: 1rem;">
-          <!-- 動態載入保養與狀況紀錄卡片 -->
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. 車輛資料管理 (Vehicle View) -->
-    <section id="vehicleView" class="view-section hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="font-size: 1.15rem; font-weight: 700;"><i class="fa-solid fa-car-side"></i> 車隊清單與保養狀態</h2>
-        <button class="btn btn-accent" id="btnOpenAddVehicle">
-          <i class="fa-solid fa-plus"></i> 新增公務車
-        </button>
-      </div>
-
-      <div class="vehicle-grid" id="vehicleGrid" style="margin-bottom: 2rem;">
-        <!-- 動態渲染公務車卡片 -->
-      </div>
-
-      <!-- 油卡餘額與加油紀錄管理專區 -->
+    <!-- 2.5 油卡與加油紀錄 (Fuel View) -->
+    <section id="fuelView" class="view-section hidden">
       <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
             <h2 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-credit-card" style="color: #059669;"></i> 公務車油卡餘額與加油紀錄管理
+              <i class="fa-solid fa-gas-pump" style="color: #059669;"></i> 公務車油卡餘額與加油紀錄管理
             </h2>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
               管理車隊中油/台塑實體加油卡餘額、儲值加值與各車次加油發票扣款明細
@@ -297,6 +245,65 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- 3. 公務車保養及狀況紀錄 (Maintenance & Incident Record View) -->
+    <section id="maintenanceView" class="view-section hidden">
+      <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-wrench" style="color: var(--primary-color);"></i> 公務車保養及狀況紀錄
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+              已匯入「公務車事件紀錄.xlsx」之歷史維修、保養與驗車事件檔案（共 <span id="maintCountBadge" style="font-weight: 700; color: var(--primary-color);">0</span> 筆紀錄）
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-primary" id="btnOpenAddMaint">
+              <i class="fa-solid fa-plus"></i> 新增保養/事件紀錄
+            </button>
+          </div>
+        </div>
+
+        <!-- 搜尋與類別篩選列 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; background: var(--bg-main); padding: 0.75rem; border-radius: var(--radius-md);">
+          <div style="position: relative; width: 320px;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+            <input type="text" class="input-control" id="searchMaintInput" placeholder="搜尋保養、驗車、維修或關鍵字..." style="padding-left: 2.3rem; width: 100%;">
+          </div>
+
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="maintCategoryChips">
+            <button class="btn btn-secondary btn-maint-filter active" data-cat="ALL" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">全部紀錄</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="待處理" id="btnFilterPending" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700;">
+              ⏳ 待處理 <span id="pendingCountBadge" class="pending-count-badge">0</span>
+            </button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="維修" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">🔧 維修</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="保養" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">⚙️ 保養</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="驗車" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">📋 驗車</button>
+          </div>
+        </div>
+
+        <!-- 歷史事件時間軸與卡片清單 Grid -->
+        <div id="maintCardList" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- 動態載入保養與狀況紀錄卡片 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 車輛資料管理 (Vehicle View) -->
+    <section id="vehicleView" class="view-section hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 700;"><i class="fa-solid fa-car-side"></i> 車隊清單與保養狀態</h2>
+        <button class="btn btn-accent" id="btnOpenAddVehicle">
+          <i class="fa-solid fa-plus"></i> 新增公務車
+        </button>
+      </div>
+
+      <div class="vehicle-grid" id="vehicleGrid" style="margin-bottom: 2rem;">
+        <!-- 動態渲染公務車卡片 -->
       </div>
 
       <!-- 出勤同仁與常用人員名單管理專區 -->
@@ -799,6 +806,6 @@
   </button>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>
