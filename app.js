@@ -9,6 +9,7 @@
 const STORAGE_KEY_RECORDS = 'car_records_db_v1';
 const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v1';
 const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v1';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v1';
 
 const state = {
   currentDate: new Date(), // 當前月曆檢視的基準日期
@@ -20,7 +21,8 @@ const state = {
   tempSignature: '',
   records: [],
   vehicles: [],
-  maintenanceRecords: []
+  maintenanceRecords: [],
+  fuelTransactions: []
 };
 
 // 來自「公務車事件紀錄.xlsx」之歷史保養與事件數據 (含待處理任務)
@@ -42,9 +44,15 @@ const EXCEL_IMPORTED_MAINTENANCE_RECORDS = [
   { id: "maint-13", date: "2023-02-17 18:48", category: "維修", title: "公務車左後輪插到釘子 已補胎完成", content: "", status: "COMPLETED" }
 ];
 
+// 預設示範油卡儲值與加油紀錄
+const EXCEL_IMPORTED_FUEL_TRANSACTIONS = [
+  { id: 'ft-101', carId: 'v1', type: 'TOPUP', amount: 5000, date: '2026-08-01 09:00', balanceAfter: 5000, note: '總務處統一油卡預付儲值' },
+  { id: 'ft-102', carId: 'v1', type: 'EXPENSE', amount: 1500, date: '2026-08-10 17:30', balanceAfter: 3500, note: '台灣中油西屯站 / 駕駛：林大為 / 發票：AB88921021' }
+];
+
 // 預設固定公務車輛
 const DEFAULT_VEHICLES = [
-  { id: 'v1', plate: 'ABC-1234', model: '公務車 (Toyota Altis)', type: '轎車', mileage: 42850, status: 'AVAILABLE' }
+  { id: 'v1', plate: 'ALZ-3759', model: '公務車 (Toyota Altis)', type: '轎車', mileage: 42850, status: 'AVAILABLE', fuelCardNo: '中油捷利卡 #8839-2041', fuelCardBalance: 3500 }
 ];
 
 // 產生預設簽名 Data URL 示範圖片 (簡單 Canvas 產生文字樣式簽名)
@@ -203,6 +211,18 @@ function loadData() {
     }
     saveMaintenance();
   }
+
+  const localFuelTx = localStorage.getItem(STORAGE_KEY_FUEL_TX);
+  if (localFuelTx) {
+    state.fuelTransactions = JSON.parse(localFuelTx);
+  } else {
+    state.fuelTransactions = EXCEL_IMPORTED_FUEL_TRANSACTIONS;
+    saveFuelTransactions();
+  }
+}
+
+function saveFuelTransactions() {
+  localStorage.setItem(STORAGE_KEY_FUEL_TX, JSON.stringify(state.fuelTransactions));
 }
 
 // 產生範例事件照片 Data URL
@@ -499,7 +519,18 @@ function renderVehicles() {
       <div style="background: var(--bg-main); padding: 0.6rem; border-radius: var(--radius-sm); font-size: 0.85rem;">
         <i class="fa-solid fa-gauge"></i> 當前儀表里程：<strong>${(v.mileage || 0).toLocaleString()} km</strong>
       </div>
-      <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.65rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #166534; display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
+        <div>
+          <i class="fa-solid fa-credit-card" style="color: #059669;"></i> <strong>${v.fuelCardNo || '未綁定油卡'}</strong>
+        </div>
+        <div style="font-size: 0.95rem; font-weight: 700; color: #047857;">
+          NT$ ${(v.fuelCardBalance || 0).toLocaleString()}
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; flex-wrap: wrap;">
+        <button class="btn btn-secondary btn-quick-fuel-tx" data-id="${v.id}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; color: #059669; border-color: #a7f3d0; background: #ecfdf5;">
+          <i class="fa-solid fa-gas-pump"></i> 儲值/加油
+        </button>
         <button class="btn btn-secondary btn-edit-vehicle" data-id="${v.id}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
           <i class="fa-solid fa-pen"></i> 編輯
         </button>
@@ -512,12 +543,86 @@ function renderVehicles() {
   });
 }
 
+// (D.2) 渲染油卡餘額與交易明細管理 (Fuel Card Management)
+function renderFuelCardManagement() {
+  const tbody = document.getElementById('fuelTransactionTbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  // 1. 計算車隊總油卡餘額
+  const totalBalance = state.vehicles.reduce((acc, v) => acc + (v.fuelCardBalance || 0), 0);
+  const elTotalBal = document.getElementById('statTotalFuelBalance');
+  if (elTotalBal) elTotalBal.innerText = `NT$ ${totalBalance.toLocaleString()}`;
+
+  // 2. 計算綁定油卡張數
+  const cardCount = state.vehicles.filter(v => v.fuelCardNo && v.fuelCardNo.trim() !== '').length;
+  const elCardCount = document.getElementById('statFuelCardCount');
+  if (elCardCount) elCardCount.innerText = `${cardCount} 張`;
+
+  // 3. 計算本月加油總花費
+  const now = new Date();
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth();
+  const monthExpenses = state.fuelTransactions.filter(tx => {
+    if (tx.type !== 'EXPENSE') return false;
+    const d = new Date(tx.date);
+    return d.getFullYear() === currentY && d.getMonth() === currentM;
+  }).reduce((acc, tx) => acc + (tx.amount || 0), 0);
+  const elMonthExp = document.getElementById('statMonthFuelExpense');
+  if (elMonthExp) elMonthExp.innerText = `NT$ ${monthExpenses.toLocaleString()}`;
+
+  if (state.fuelTransactions.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-light); display: block;"></i>
+          尚無油卡加值或加油扣款異動紀錄
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // 排序：最新交易在最上面
+  const sortedTx = [...state.fuelTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  sortedTx.forEach(tx => {
+    const vehicle = state.vehicles.find(v => v.id === tx.carId);
+    const carInfo = vehicle ? `${vehicle.plate} (${vehicle.model})<br><span style="font-size:0.75rem; color:var(--text-muted);">${vehicle.fuelCardNo || '無卡號'}</span>` : '未知車輛';
+    
+    const isTopUp = tx.type === 'TOPUP';
+    const typeBadge = isTopUp 
+      ? `<span style="background:#d1fae5; color:#059669; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">🟢 油卡儲值</span>`
+      : `<span style="background:#fee2e2; color:#dc2626; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">⛽ 加油扣款</span>`;
+
+    const amtStr = isTopUp ? `+ NT$ ${tx.amount.toLocaleString()}` : `- NT$ ${tx.amount.toLocaleString()}`;
+    const amtColor = isTopUp ? '#059669' : '#dc2626';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><div style="font-weight:700;">${tx.date}</div></td>
+      <td>${carInfo}</td>
+      <td>${typeBadge}</td>
+      <td><span style="font-weight:700; color:${amtColor};">${amtStr}</span></td>
+      <td><strong>NT$ ${(tx.balanceAfter || 0).toLocaleString()}</strong></td>
+      <td><div style="font-size:0.85rem; color:#334155;">${tx.note || '無'}</div></td>
+      <td style="text-align: right;">
+        <button class="btn btn-icon btn-delete-fuel-tx" data-id="${tx.id}" title="刪除此筆交易">
+          <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 // 刷新全系統介面
 function refreshApp() {
   updateMetrics();
   renderCalendar();
   renderTable();
   renderVehicles();
+  renderFuelCardManagement();
   renderMaintenance();
 }
 
@@ -1027,6 +1132,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const model = document.getElementById('vehicleModel').value.trim();
     const type = document.getElementById('vehicleType').value;
     const mileage = parseInt(document.getElementById('vehicleCurrentMileage').value) || 0;
+    const fuelCardNo = document.getElementById('vehicleFuelCardNo').value.trim();
+    const fuelCardBalance = parseInt(document.getElementById('vehicleFuelCardBalance').value) || 0;
     const status = document.getElementById('vehicleStatus').value;
 
     if (editId) {
@@ -1036,6 +1143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         v.model = model;
         v.type = type;
         v.mileage = mileage;
+        v.fuelCardNo = fuelCardNo;
+        v.fuelCardBalance = fuelCardBalance;
         v.status = status;
       }
     } else {
@@ -1045,6 +1154,8 @@ document.addEventListener('DOMContentLoaded', () => {
         model: model,
         type: type,
         mileage: mileage,
+        fuelCardNo: fuelCardNo,
+        fuelCardBalance: fuelCardBalance,
         status: status
       };
       state.vehicles.push(newV);
@@ -1067,6 +1178,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('vehicleModel').value = v.model;
         document.getElementById('vehicleType').value = v.type;
         document.getElementById('vehicleCurrentMileage').value = v.mileage;
+        const elCardNo = document.getElementById('vehicleFuelCardNo');
+        if (elCardNo) elCardNo.value = v.fuelCardNo || '';
+        const elCardBal = document.getElementById('vehicleFuelCardBalance');
+        if (elCardBal) elCardBal.value = v.fuelCardBalance || 0;
         document.getElementById('vehicleStatus').value = v.status;
         document.getElementById('modalVehicleTitle').innerText = '編輯公務車資料';
         modalVehicle.classList.add('active');
@@ -1079,6 +1194,113 @@ document.addEventListener('DOMContentLoaded', () => {
       if (confirm('確定要移除此車輛嗎？')) {
         state.vehicles = state.vehicles.filter(v => v.id !== id);
         saveVehicles();
+        refreshApp();
+      }
+    }
+  });
+
+  // ------------------------------------------------------------------------
+  // F.2 油卡與加油交易紀錄 Modal 控制
+  // ------------------------------------------------------------------------
+  const modalFuelTx = document.getElementById('modalFuelTx');
+  const formFuelTx = document.getElementById('formFuelTx');
+
+  const openFuelTxModal = (txId = '', presetCarId = '') => {
+    if (!formFuelTx || !modalFuelTx) return;
+    formFuelTx.reset();
+    document.getElementById('fuelTxEditId').value = '';
+
+    // 填入車輛選單
+    const selectCar = document.getElementById('fuelTxCarId');
+    selectCar.innerHTML = '';
+    state.vehicles.forEach(v => {
+      selectCar.innerHTML += `<option value="${v.id}" ${presetCarId === v.id ? 'selected' : ''}>${v.plate} - ${v.model} (${v.fuelCardNo || '未綁卡'})</option>`;
+    });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('fuelTxDate').value = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
+    modalFuelTx.classList.add('active');
+  };
+
+  const btnOpenFuelTx = document.getElementById('btnOpenAddFuelTx');
+  if (btnOpenFuelTx) btnOpenFuelTx.addEventListener('click', () => openFuelTxModal());
+
+  const btnCloseFuelTx = document.getElementById('btnCloseFuelTxModal');
+  if (btnCloseFuelTx) btnCloseFuelTx.addEventListener('click', () => modalFuelTx.classList.remove('active'));
+
+  const btnCancelFuelTx = document.getElementById('btnCancelFuelTx');
+  if (btnCancelFuelTx) btnCancelFuelTx.addEventListener('click', () => modalFuelTx.classList.remove('active'));
+
+  // 車輛卡片上的快捷「儲值/加油」按鈕
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-quick-fuel-tx');
+    if (btn) {
+      const carId = btn.getAttribute('data-id');
+      openFuelTxModal('', carId);
+    }
+  });
+
+  // 提交加油/儲值紀錄表單
+  if (formFuelTx) {
+    formFuelTx.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const carId = document.getElementById('fuelTxCarId').value;
+      const type = document.getElementById('fuelTxType').value;
+      const amount = parseInt(document.getElementById('fuelTxAmount').value) || 0;
+      const rawDate = document.getElementById('fuelTxDate').value;
+      const date = rawDate.replace('T', ' ');
+      const note = document.getElementById('fuelTxNote').value.trim();
+
+      const vehicle = state.vehicles.find(v => v.id === carId);
+      if (!vehicle) {
+        alert('請選擇有效車輛');
+        return;
+      }
+
+      let currentBal = vehicle.fuelCardBalance || 0;
+      let newBalance = currentBal;
+      if (type === 'TOPUP') {
+        newBalance = currentBal + amount;
+      } else {
+        newBalance = currentBal - amount;
+      }
+      vehicle.fuelCardBalance = newBalance;
+
+      const newTx = {
+        id: 'ft-' + Date.now(),
+        carId: carId,
+        type: type,
+        amount: amount,
+        date: date,
+        balanceAfter: newBalance,
+        note: note
+      };
+
+      state.fuelTransactions.unshift(newTx);
+
+      saveVehicles();
+      saveFuelTransactions();
+      refreshApp();
+      modalFuelTx.classList.remove('active');
+    });
+  }
+
+  // 刪除單筆油卡異動紀錄
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-delete-fuel-tx');
+    if (btn) {
+      const id = btn.getAttribute('data-id');
+      if (confirm('確定要刪除這筆油卡交易紀錄嗎？')) {
+        state.fuelTransactions = state.fuelTransactions.filter(tx => tx.id !== id);
+        saveFuelTransactions();
         refreshApp();
       }
     }

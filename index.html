@@ -212,8 +212,81 @@
         </button>
       </div>
 
-      <div class="vehicle-grid" id="vehicleGrid">
+      <div class="vehicle-grid" id="vehicleGrid" style="margin-bottom: 2rem;">
         <!-- 動態渲染公務車卡片 -->
+      </div>
+
+      <!-- 油卡餘額與加油紀錄管理專區 -->
+      <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-credit-card" style="color: #059669;"></i> 公務車油卡餘額與加油紀錄管理
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+              管理車隊中油/台塑實體加油卡餘額、儲值加值與各車次加油發票扣款明細
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-primary" id="btnOpenAddFuelTx" style="background: #059669; border-color: #059669;">
+              <i class="fa-solid fa-gas-pump"></i> 新增加油 / 儲值異動紀錄
+            </button>
+          </div>
+        </div>
+
+        <!-- 油卡數據統計指標卡片 -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 1rem; display: flex; align-items: center; gap: 0.85rem;">
+            <div style="width: 42px; height: 42px; background: #d1fae5; color: #059669; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: #047857; font-weight: 600;">車隊油卡總餘額</div>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #065f46; margin-top: 0.1rem;" id="statTotalFuelBalance">NT$ 0</div>
+            </div>
+          </div>
+
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 1rem; display: flex; align-items: center; gap: 0.85rem;">
+            <div style="width: 42px; height: 42px; background: #dbeafe; color: #2563eb; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+              <i class="fa-solid fa-credit-card"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">綁定油卡數量</div>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #1e3a8a; margin-top: 0.1rem;" id="statFuelCardCount">0 張</div>
+            </div>
+          </div>
+
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-md); padding: 1rem; display: flex; align-items: center; gap: 0.85rem;">
+            <div style="width: 42px; height: 42px; background: #fee2e2; color: #dc2626; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+              <i class="fa-solid fa-fire-flame-simple"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: #991b1b; font-weight: 600;">本月加油總花費</div>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #7f1d1d; margin-top: 0.1rem;" id="statMonthFuelExpense">NT$ 0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 油卡交易歷史清單表格 -->
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>交易時間</th>
+                <th>車輛 / 油卡卡號</th>
+                <th>異動類別</th>
+                <th>金額</th>
+                <th>異動後餘額</th>
+                <th>加油站 / 經手人 / 備註</th>
+                <th style="text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="fuelTransactionTbody">
+              <!-- 動態載入油卡交易明細 -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -435,6 +508,16 @@
           </div>
 
           <div class="form-group">
+            <label class="form-label">綁定油卡卡號 (Fuel Card No.)</label>
+            <input type="text" class="input-control" id="vehicleFuelCardNo" placeholder="例：中油加油卡 #8839-2041">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">油卡當前餘額 (NT$)</label>
+            <input type="number" class="input-control" id="vehicleFuelCardBalance" placeholder="例：3500" min="0" value="0">
+          </div>
+
+          <div class="form-group">
             <label class="form-label">狀態</label>
             <select class="select-control" id="vehicleStatus">
               <option value="AVAILABLE">🟢 可正常出勤</option>
@@ -447,6 +530,65 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btnCancelVehicle">取消</button>
           <button type="submit" class="btn btn-primary">儲存車輛資料</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 4.5: 油卡加油 / 儲值異動紀錄彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalFuelTx">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalFuelTxTitle">
+          <i class="fa-solid fa-gas-pump" style="color: #059669;"></i> 新增加油 / 儲值異動紀錄
+        </h3>
+        <button class="btn-close-modal" id="btnCloseFuelTxModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formFuelTx">
+        <input type="hidden" id="fuelTxEditId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">選擇車輛與對應油卡 <span class="required">*</span></label>
+            <select class="select-control" id="fuelTxCarId" required>
+              <!-- 動態載入車輛選單 -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">異動類別 <span class="required">*</span></label>
+            <select class="select-control" id="fuelTxType" required>
+              <option value="EXPENSE">⛽ 加油扣款 (油卡扣款/加油支出)</option>
+              <option value="TOPUP">🟢 油卡儲值 (公司加值/預付充值)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">金額 (NT$) <span class="required">*</span></label>
+            <input type="number" class="input-control" id="fuelTxAmount" placeholder="例：1500" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">交易時間 <span class="required">*</span></label>
+            <input type="datetime-local" class="input-control" id="fuelTxDate" step="1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">加油站名 / 經手人 / 發票備註</label>
+            <input type="text" class="input-control" id="fuelTxNote" placeholder="例：台灣中油西屯站 / 駕駛：林大為 / 發票：AB12345678">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelFuelTx">取消</button>
+          <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669;">
+            <i class="fa-solid fa-floppy-disk"></i> 儲存交易紀錄
+          </button>
         </div>
       </form>
     </div>
@@ -560,6 +702,6 @@
   </div>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
