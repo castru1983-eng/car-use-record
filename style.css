@@ -1,0 +1,976 @@
+/* ==========================================================================
+   公務車使用紀錄簽到系統 - 主樣式表 (Design System & Styles)
+   ========================================================================== */
+
+:root {
+  /* 顏色變數 Design Tokens */
+  --primary-hue: 220;
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-light: #eff6ff;
+  
+  --accent-color: #0d9488;
+  --accent-light: #ccfbf1;
+
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #6366f1;
+
+  --bg-main: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-sidebar: #0f172a;
+
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+
+  --border-color: #e2e8f0;
+  --border-focus: #93c5fd;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+/* 全域重置 */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 頂部導覽列 Navbar */
+.navbar {
+  background: var(--bg-sidebar);
+  color: #ffffff;
+  padding: 0.85rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.navbar-brand i {
+  color: #38bdf8;
+  font-size: 1.5rem;
+}
+
+.navbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition-fast);
+}
+
+.nav-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-btn.active {
+  color: #ffffff;
+  background: var(--primary-color);
+}
+
+/* 主內容區域 Layout */
+.app-container {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 統計指標數據列 Metrics */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.metric-icon.blue { background: #dbeafe; color: #2563eb; }
+.metric-icon.green { background: #d1fae5; color: #059669; }
+.metric-icon.amber { background: #fef3c7; color: #d97706; }
+.metric-icon.purple { background: #ede9fe; color: #7c3aed; }
+
+.metric-info .label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.metric-info .value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+  margin-top: 0.2rem;
+}
+
+/* 控制面板與工具列 Toolbar */
+.toolbar {
+  background: var(--bg-card);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.month-navigator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-main);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.current-month-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  min-width: 140px;
+  text-align: center;
+  color: var(--text-main);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+.btn-secondary:hover {
+  background: var(--bg-main);
+  border-color: #cbd5e1;
+}
+
+.btn-accent {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+.btn-accent:hover {
+  background: #0f766e;
+}
+
+.btn-icon {
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+.btn-icon:hover {
+  background: #ffffff;
+  color: var(--text-main);
+}
+
+.select-control, .input-control {
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  color: var(--text-main);
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+.select-control:focus, .input-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* ==========================================================================
+   日曆視圖 (Calendar View Grid) - 重現紙本日曆的體驗
+   ========================================================================== */
+.calendar-container {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-header-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.calendar-header-day {
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.calendar-header-day.weekend {
+  color: #ef4444;
+}
+
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(130px, 1fr);
+  background: var(--border-color);
+  gap: 1px; /* 網格分隔線 */
+}
+
+.calendar-cell {
+  background: #ffffff;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: background-color var(--transition-fast);
+  min-height: 130px;
+}
+
+.calendar-cell:hover {
+  background-color: #f8fafc;
+}
+
+.calendar-cell.other-month {
+  background-color: #f1f5f9;
+  opacity: 0.6;
+}
+
+.calendar-cell.today {
+  background-color: #eff6ff;
+}
+.calendar-cell.today .date-number {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-cell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.date-number {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.btn-add-quick {
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+
+.calendar-cell:hover .btn-add-quick {
+  opacity: 1;
+}
+
+.btn-add-quick:hover {
+  background: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.record-badges-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow-y: auto;
+  max-height: 140px;
+  padding-right: 2px;
+}
+
+/* 日曆內簽到卡片 (Record Card) */
+.record-tag {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-color);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.record-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.record-tag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.record-tag-car {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.record-tag-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* 日曆格內的簽名圖片直觀展現 (Direct Hand-written Signature Image) */
+.record-signature-img {
+  max-height: 38px;
+  width: auto;
+  object-fit: contain;
+  margin-top: 0.15rem;
+  filter: contrast(1.1);
+  display: block;
+}
+
+/* 班別選擇晶片群組 (Shift Selector Chips) */
+.shift-selector-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.shift-chip {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: var(--transition-fast);
+}
+
+.shift-chip:hover {
+  background: #e2e8f0;
+}
+
+.shift-chip.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+/* 狀態顏色標籤 - 早班 / 晚班 */
+.record-tag.shift-morning {
+  border-left-color: #f59e0b; /* ☀️ 溫暖黃橘色代表早班 */
+  background: #fffbeb;
+}
+.record-tag.shift-evening {
+  border-left-color: #6366f1; /* 🌙 質感深藍紫色代表晚班 */
+  background: #f5f3ff;
+}
+.record-tag.shift-full {
+  border-left-color: #0d9488;
+  background: #f0fdf4;
+}
+
+/* ==========================================================================
+   保養及狀況紀錄卡片 (Maintenance Record Cards)
+   ========================================================================== */
+.maint-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  border-left: 5px solid var(--primary-color);
+}
+
+.maint-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.maint-card.cat-維修 { border-left-color: #ef4444; }
+.maint-card.cat-保養 { border-left-color: #2563eb; }
+.maint-card.cat-驗車 { border-left-color: #10b981; }
+.maint-card.cat-狀況備註 { border-left-color: #8b5cf6; }
+
+.maint-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.maint-title-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.maint-date-badge {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-main);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.maint-content-box {
+  background: #f8fafc;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: #334155;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.maint-photo-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.maint-photo-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.maint-photo-thumb:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-maint-filter.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+}
+
+/* ==========================================================================
+   表格清單檢視 (Table View)
+   ========================================================================== */
+.table-container {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.custom-table th {
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.custom-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.custom-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-badge.reserved { background: #fef3c7; color: #b45309; }
+.status-badge.active { background: #dbeafe; color: #1d4ed8; }
+.status-badge.completed { background: #d1fae5; color: #047857; }
+
+/* 簽名微縮圖 */
+.signature-thumb {
+  max-height: 28px;
+  max-width: 70px;
+  object-fit: contain;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 2px;
+}
+
+/* ==========================================================================
+   彈窗系統 (Modal System)
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-normal), visibility var(--transition-normal);
+  padding: 1rem;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  transform: translateY(20px);
+  transition: transform var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close-modal:hover {
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: #f8fafc;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* 表單元件 Form Controls */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group.full-width {
+  grid-column: span 2;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.form-label .required {
+  color: var(--danger-color);
+}
+
+/* 手寫簽名板區域 Canvas Signature Area */
+.signature-pad-container {
+  border: 2px dashed #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.signature-canvas {
+  width: 100%;
+  height: 180px;
+  touch-action: none; /* 防止手機滑動拖曳頁面 */
+  cursor: crosshair;
+}
+
+.signature-controls {
+  width: 100%;
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+.signature-placeholder-text {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-light);
+  font-size: 0.95rem;
+  pointer-events: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.signature-preview-box {
+  width: 100%;
+  height: 90px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.signature-preview-box img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* 車輛管理分頁 Styles */
+.vehicle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.vehicle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.vehicle-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vehicle-plate {
+  font-family: monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+}
+
+.vehicle-status-tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+.vehicle-status-tag.available { background: #d1fae5; color: #047857; }
+.vehicle-status-tag.in-use { background: #dbeafe; color: #1d4ed8; }
+
+/* 隱藏區塊 Helper */
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================================================
+   列印模式專用樣式 (@media print) - 整月日曆輸出
+   ========================================================================== */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .navbar, .toolbar, .metrics-grid, .btn, .btn-add-quick, .modal-overlay {
+    display: none !important;
+  }
+
+  .app-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .calendar-container {
+    border: 1px solid #000000 !important;
+    box-shadow: none !important;
+  }
+
+  .calendar-header-grid {
+    background: #e2e8f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .calendar-header-day {
+    color: #000000 !important;
+    font-weight: bold !important;
+  }
+
+  .calendar-days-grid {
+    background: #000000 !important;
+  }
+
+  .calendar-cell {
+    background: #ffffff !important;
+    min-height: 120px !important;
+    page-break-inside: avoid;
+  }
+
+  .record-tag {
+    border: 1px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .print-header h1 {
+    font-size: 1.5rem;
+  }
+}
+
+.print-header {
+  display: none;
+}

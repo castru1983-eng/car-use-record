@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公務車使用紀錄簽到系統 | Fleet Sign-in System</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 列印抬頭 (列印時才顯示) -->
+  <div class="print-header">
+    <h1>公務車使用登記簽到表</h1>
+    <p id="printMonthText">月份：2026年08月</p>
+  </div>
+
+  <!-- 頂部導覽列 Navbar -->
+  <nav class="navbar">
+    <a href="#" class="navbar-brand">
+      <i class="fa-solid fa-car-side"></i>
+      <span>公務車簽到紀錄系統</span>
+    </a>
+    <ul class="navbar-nav">
+      <li>
+        <button class="nav-btn active" id="tabCalendar" data-target="calendarView">
+          <i class="fa-regular fa-calendar-days"></i> 月曆簽到視圖
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" id="tabTable" data-target="tableView">
+          <i class="fa-solid fa-list-check"></i> 使用紀錄清單
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" id="tabMaintenance" data-target="maintenanceView">
+          <i class="fa-solid fa-wrench"></i> 車輛保養與狀況紀錄
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" id="tabVehicle" data-target="vehicleView">
+          <i class="fa-solid fa-car-rear"></i> 車輛資料管理
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- 主內容區域 -->
+  <main class="app-container">
+
+    <!-- 數據指標卡片 (Metrics) -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon blue">
+          <i class="fa-solid fa-calendar-check"></i>
+        </div>
+        <div class="metric-info">
+          <div class="label">本月出車紀錄</div>
+          <div class="value" id="metricMonthCount">0 次</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 工具列與切換控制 (Toolbar) -->
+    <section class="toolbar">
+      <div class="toolbar-left">
+        <!-- 月份導覽切換 -->
+        <div class="month-navigator">
+          <button class="btn-icon" id="btnPrevMonth" title="上一個月">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <div class="current-month-title" id="currentMonthDisplay">2026 年 08 月</div>
+          <button class="btn-icon" id="btnNextMonth" title="下一個月">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+
+        <button class="btn btn-secondary" id="btnToday">
+          <i class="fa-regular fa-calendar-dot"></i> 返回今天
+        </button>
+
+        <!-- 車輛篩選 -->
+        <select class="select-control" id="selectCarFilter">
+          <option value="ALL">🚗 全部公務車輛</option>
+          <!-- 動態載入車輛選項 -->
+        </select>
+      </div>
+
+      <div class="toolbar-right">
+        <button class="btn btn-primary" id="btnOpenNewRecord">
+          <i class="fa-solid fa-plus"></i> 新增預約 / 簽到出車
+        </button>
+
+        <button class="btn btn-secondary" id="btnExportCsv" title="匯出 Excel / CSV 報表">
+          <i class="fa-solid fa-file-excel"></i> 匯出報表
+        </button>
+
+        <button class="btn btn-secondary" id="btnPrintCalendar" title="列印當月紙本日曆簽到表">
+          <i class="fa-solid fa-print"></i> 列印月曆
+        </button>
+      </div>
+    </section>
+
+    <!-- 1. 月曆簽到視圖 (Calendar View) -->
+    <section id="calendarView" class="view-section">
+      <div class="calendar-container">
+        <div class="calendar-header-grid">
+          <div class="calendar-header-day weekend">週日</div>
+          <div class="calendar-header-day">週一</div>
+          <div class="calendar-header-day">週二</div>
+          <div class="calendar-header-day">週三</div>
+          <div class="calendar-header-day">週四</div>
+          <div class="calendar-header-day">週五</div>
+          <div class="calendar-header-day weekend">週六</div>
+        </div>
+        <div class="calendar-days-grid" id="calendarDaysGrid">
+          <!-- 動態渲染當月 35~42 個日曆格子 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 表格清單檢視 (Table View) -->
+    <section id="tableView" class="view-section hidden">
+      <div class="table-container">
+        <div style="padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+          <div style="position: relative; width: 300px;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+            <input type="text" class="input-control" id="searchTableInput" placeholder="搜尋駕駛人、部門、目的地或車號..." style="padding-left: 2.3rem; width: 100%;">
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">
+            顯示共 <span id="tableRecordCount" style="font-weight: 700; color: var(--primary-color);">0</span> 筆紀錄
+          </div>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>簽到日期</th>
+              <th>簽到班別</th>
+              <th>電子手寫簽名</th>
+              <th>特別備註</th>
+              <th style="text-align: right;">操作項目</th>
+            </tr>
+          </thead>
+          <tbody id="recordTableBody">
+            <!-- 動態渲染表格列 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. 公務車保養及狀況紀錄 (Maintenance & Incident Record View) -->
+    <section id="maintenanceView" class="view-section hidden">
+      <div style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-wrench" style="color: var(--primary-color);"></i> 公務車保養及狀況紀錄
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+              已匯入「公務車事件紀錄.xlsx」之歷史維修、保養與驗車事件檔案（共 <span id="maintCountBadge" style="font-weight: 700; color: var(--primary-color);">0</span> 筆紀錄）
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-primary" id="btnOpenAddMaint">
+              <i class="fa-solid fa-plus"></i> 新增保養/事件紀錄
+            </button>
+          </div>
+        </div>
+
+        <!-- 搜尋與類別篩選列 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; background: var(--bg-main); padding: 0.75rem; border-radius: var(--radius-md);">
+          <div style="position: relative; width: 320px;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+            <input type="text" class="input-control" id="searchMaintInput" placeholder="搜尋保養、驗車、維修或關鍵字..." style="padding-left: 2.3rem; width: 100%;">
+          </div>
+
+          <div style="display: flex; gap: 0.4rem;" id="maintCategoryChips">
+            <button class="btn btn-secondary btn-maint-filter active" data-cat="ALL" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">全部紀錄</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="維修" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">🔧 維修</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="保養" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">⚙️ 保養</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="驗車" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">📋 驗車</button>
+          </div>
+        </div>
+
+        <!-- 歷史事件時間軸與卡片清單 Grid -->
+        <div id="maintCardList" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- 動態載入保養與狀況紀錄卡片 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 車輛資料管理 (Vehicle View) -->
+    <section id="vehicleView" class="view-section hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.15rem; font-weight: 700;"><i class="fa-solid fa-car-side"></i> 車隊清單與保養狀態</h2>
+        <button class="btn btn-accent" id="btnOpenAddVehicle">
+          <i class="fa-solid fa-plus"></i> 新增公務車
+        </button>
+      </div>
+
+      <div class="vehicle-grid" id="vehicleGrid">
+        <!-- 動態渲染公務車卡片 -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================================
+       彈窗 Modal 1: 支援「早班 / 晚班」與「特別備註」之手寫簽到彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalRecord">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalRecordTitle">
+          <i class="fa-solid fa-pen-nib" style="color: var(--primary-color);"></i> 公務車簽到
+        </h3>
+        <button class="btn-close-modal btnCloseRecordModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formRecord">
+        <input type="hidden" id="recordId" value="">
+        <input type="hidden" id="formCarId" value="v1">
+        <input type="hidden" id="formDate" value="">
+        <input type="hidden" id="formShift" value="早班">
+
+        <div class="modal-body" style="gap: 0.85rem;">
+          <!-- 日期與車號資訊標頭 -->
+          <div style="background: var(--primary-light); color: var(--primary-color); padding: 0.6rem 0.85rem; border-radius: var(--radius-md); font-weight: 700; display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem;">
+            <span><i class="fa-solid fa-car-side"></i> 公務車 (ABC-1234)</span>
+            <span id="displaySignDate"><i class="fa-regular fa-calendar"></i> 2026-08-12</span>
+          </div>
+
+          <!-- 1. 班別選擇晶片 (Shift Select Buttons) -->
+          <div>
+            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.35rem;">
+              <i class="fa-solid fa-clock"></i> 選擇簽到班別：
+            </label>
+            <div class="shift-selector-group">
+              <button type="button" class="shift-chip active" data-shift="早班">
+                ☀️ 早班
+              </button>
+              <button type="button" class="shift-chip" data-shift="晚班">
+                🌙 晚班
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 特別備註 (Optional Note) -->
+          <div>
+            <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
+              <i class="fa-solid fa-comment-dots"></i> 特別備註 (選填)：
+            </label>
+            <input type="text" class="input-control" id="formNoteQuick" placeholder="例：台中出差、洗車加油、維修保養..." style="padding: 0.45rem 0.75rem; font-size: 0.88rem;">
+          </div>
+
+          <!-- 3. 直接手寫簽名板區域 -->
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+              <label class="form-label" style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-main);">
+                ✍️ 手寫電子簽名 <span class="required">*</span>
+              </label>
+              <button type="button" class="btn btn-secondary" id="btnClearEmbeddedSig" style="padding: 0.18rem 0.55rem; font-size: 0.78rem;">
+                <i class="fa-solid fa-eraser"></i> 重簽
+              </button>
+            </div>
+
+            <div class="signature-pad-container" style="border: 2px solid var(--primary-color); border-radius: var(--radius-md);">
+              <canvas id="embeddedSignatureCanvas" class="signature-canvas" width="430" height="170"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 0.85rem 1.25rem;">
+          <button type="button" class="btn btn-secondary btnCloseRecordModal">取消</button>
+          <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.4rem; font-size: 1rem; font-weight: 700; background: var(--accent-color);">
+            <i class="fa-solid fa-signature"></i> 簽名完成
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 2: 電子手寫簽名板 (Signature Canvas Modal)
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalSignature">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i class="fa-solid fa-pen-fancy" style="color: var(--accent-color);"></i> 請在下方區域進行手寫簽名
+        </h3>
+        <button class="btn-close-modal" id="btnCloseSignatureModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="signature-pad-container">
+          <canvas id="signatureCanvas" class="signature-canvas" width="480" height="180"></canvas>
+          <div class="signature-controls">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">筆跡顏色:</span>
+              <button type="button" class="btn-color-pick" data-color="#0f172a" style="width: 20px; height: 20px; border-radius: 50%; background: #0f172a; border: 2px solid #38bdf8; cursor: pointer;"></button>
+              <button type="button" class="btn-color-pick" data-color="#2563eb" style="width: 20px; height: 20px; border-radius: 50%; background: #2563eb; border: 1px solid #ccc; cursor: pointer;"></button>
+              <button type="button" class="btn-color-pick" data-color="#ef4444" style="width: 20px; height: 20px; border-radius: 50%; background: #ef4444; border: 1px solid #ccc; cursor: pointer;"></button>
+            </div>
+            <button type="button" class="btn btn-secondary" id="btnClearSignature" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">
+              <i class="fa-solid fa-eraser"></i> 清除重簽
+            </button>
+          </div>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+          <i class="fa-solid fa-circle-info"></i> 支援手機/平板觸控手寫或電腦滑鼠簽名
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnCancelSignature">取消</button>
+        <button type="button" class="btn btn-accent" id="btnSaveSignature">
+          <i class="fa-solid fa-signature"></i> 套用簽名
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 3: 簽名與備註詳情 (Pure Signature & Note View Modal)
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalReturnCar">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i class="fa-solid fa-file-signature" style="color: var(--primary-color);"></i> 簽到紀錄詳情
+        </h3>
+        <button class="btn-close-modal" id="btnCloseReturnModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="gap: 1rem;">
+        <input type="hidden" id="returnRecordId" value="">
+
+        <!-- 日期與班別標頭 -->
+        <div style="background: var(--bg-main); padding: 0.75rem 1rem; border-radius: var(--radius-md); font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;" id="detailHeaderBox">
+          <!-- 動態載入日期與班別 -->
+        </div>
+
+        <!-- 大圖手寫簽名展示區 -->
+        <div>
+          <label class="form-label" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem;">
+            ✍️ 電子手寫簽名：
+          </label>
+          <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #ffffff; padding: 0.75rem; text-align: center;">
+            <img id="detailSignatureImg" src="" alt="手寫簽名" style="max-height: 140px; width: auto; object-fit: contain;">
+          </div>
+        </div>
+
+        <!-- 特別備註展示 -->
+        <div>
+          <label class="form-label" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem;">
+            📝 特別備註：
+          </label>
+          <div id="detailNoteBox" style="background: #f8fafc; border: 1px solid var(--border-color); padding: 0.65rem 0.85rem; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 600; color: var(--text-main); min-height: 42px;">
+            無備註
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button type="button" class="btn btn-secondary" id="btnDeleteDetailRecord" style="color: var(--danger-color); border-color: #fecaca;">
+          <i class="fa-solid fa-trash"></i> 刪除此紀錄
+        </button>
+        <button type="button" class="btn btn-secondary" id="btnCancelReturn">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 4: 車輛新增 / 編輯彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalVehicle">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalVehicleTitle">
+          <i class="fa-solid fa-car"></i> 新增公務車資料
+        </h3>
+        <button class="btn-close-modal" id="btnCloseVehicleModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formVehicle">
+        <input type="hidden" id="vehicleEditId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">公務車車牌號碼 <span class="required">*</span></label>
+            <input type="text" class="input-control" id="vehiclePlate" placeholder="例：ABC-1234" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">車輛車款名稱 <span class="required">*</span></label>
+            <input type="text" class="input-control" id="vehicleModel" placeholder="例：Toyota Corolla Altis 1.8" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">車輛類別</label>
+            <select class="select-control" id="vehicleType">
+              <option value="轎車">🚗 轎車 (5人座)</option>
+              <option value="休旅車">🚙 休旅車 / SUV</option>
+              <option value="電動車">⚡ 電動公務車 (EV)</option>
+              <option value="箱型車/貨車">🚚 箱型車 / 廂式貨車</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">當前儀表板總里程 (km)</label>
+            <input type="number" class="input-control" id="vehicleCurrentMileage" placeholder="例：35000" min="0" value="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">狀態</label>
+            <select class="select-control" id="vehicleStatus">
+              <option value="AVAILABLE">🟢 可正常出勤</option>
+              <option value="MAINTENANCE">🔧 進廠定期保養中</option>
+              <option value="OUT_OF_SERVICE">🔴 暫停使用</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelVehicle">取消</button>
+          <button type="submit" class="btn btn-primary">儲存車輛資料</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 5: 保養及狀況紀錄新增 / 編輯彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalMaintenance">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalMaintTitle">
+          <i class="fa-solid fa-wrench" style="color: var(--primary-color);"></i> 新增保養/狀況紀錄
+        </h3>
+        <button class="btn-close-modal" id="btnCloseMaintModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formMaint">
+        <input type="hidden" id="maintEditId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">日期與時間 <span class="required">*</span></label>
+            <input type="datetime-local" class="input-control" id="maintDate" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">紀錄類別 <span class="required">*</span></label>
+            <select class="select-control" id="maintCategory" required>
+              <option value="保養">⚙️ 定期保養 / 進廠保養</option>
+              <option value="維修">🔧 設備維修 / 故障排除</option>
+              <option value="驗車">📋 定期驗車紀錄</option>
+              <option value="狀況備註">🅿️ 車況 / 停車位備註</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">事件主題 (Task Name) <span class="required">*</span></label>
+            <input type="text" class="input-control" id="maintTitle" placeholder="例：公務車定期保養、右大燈更換" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">詳細內容與處置說明 (Task Content)</label>
+            <textarea class="input-control" id="maintContent" rows="3" placeholder="例：維修項目明細、保養廠報價或處置紀錄..."></textarea>
+          </div>
+
+          <!-- 照片上傳區 -->
+          <div class="form-group">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-camera" style="color: var(--primary-color);"></i> 現場/收據照片附件 (可多選)</span>
+              <span style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted);">支援 JPG/PNG 照片上傳與貼上</span>
+            </label>
+            
+            <div class="photo-upload-dropzone" id="photoDropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 1.2rem 1rem; text-align: center; background: var(--bg-main); transition: var(--transition-fast); cursor: pointer;">
+              <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: var(--primary-color); margin-bottom: 0.4rem;"></i>
+              <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">點擊或拖曳照片至此處上傳</div>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">亦可按 Ctrl+V 直接貼上剪貼簿截圖</div>
+              
+              <div style="display: flex; gap: 0.6rem; justify-content: center; margin-top: 0.85rem; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" id="btnTriggerFileSelect" style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">
+                  <i class="fa-solid fa-folder-open"></i> 選擇電腦圖片
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnTriggerCamera" style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">
+                  <i class="fa-solid fa-camera"></i> 手機拍照 / 攝影
+                </button>
+              </div>
+
+              <input type="file" id="maintPhotoInput" accept="image/*" multiple style="display: none;">
+              <input type="file" id="maintCameraInput" accept="image/*" capture="environment" style="display: none;">
+            </div>
+
+            <!-- 暫存照片縮圖預覽 -->
+            <div id="maintPhotoPreviewGallery" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.65rem;">
+              <!-- 動態載入照片縮圖 -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelMaint">取消</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 儲存紀錄</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 6: 照片大圖 Lightbox 預覽彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalPhotoPreview">
+    <div class="modal-card" style="max-width: 720px; background: rgba(15, 23, 42, 0.95); border: none; padding: 1rem;">
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+        <button type="button" class="btn-close-modal" id="btnClosePhotoPreview" style="color: #ffffff; background: rgba(255,255,255,0.2);">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div style="text-align: center;">
+        <img id="lightboxImg" src="" alt="照片檢視" style="max-width: 100%; max-height: 75vh; border-radius: var(--radius-md); object-fit: contain;">
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript 主邏輯 -->
+  <script src="app.js?v=13"></script>
+</body>
+</html>
