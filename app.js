@@ -1298,9 +1298,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnOpenMaint = document.getElementById('btnOpenAddMaint');
   if (btnOpenMaint) btnOpenMaint.addEventListener('click', () => openMaintModal('', 'COMPLETED'));
 
-  const btnOpenPending = document.getElementById('btnOpenAddPending');
-  if (btnOpenPending) btnOpenPending.addEventListener('click', () => openMaintModal('', 'PENDING'));
-
   const btnCloseMaint = document.getElementById('btnCloseMaintModal');
   if (btnCloseMaint) btnCloseMaint.addEventListener('click', () => modalMaint.classList.remove('active'));
 
