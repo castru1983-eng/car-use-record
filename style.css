@@ -543,6 +543,66 @@ body {
 .maint-card.cat-驗車 { border-left-color: #10b981; }
 .maint-card.cat-狀況備註 { border-left-color: #8b5cf6; }
 
+/* 待處理卡片高亮與醒目框線 */
+.maint-card.status-pending {
+  border-left-color: #f59e0b !important;
+  background: #fffdf5;
+  border-top: 2px solid #fcd34d;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.18);
+}
+
+/* 待處理計數晶片徽章 */
+.pending-count-badge {
+  background: #cbd5e1;
+  color: #475569;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+  display: inline-block;
+  transition: var(--transition-fast);
+}
+
+.pending-count-badge.has-pending {
+  background: #ef4444;
+  color: #ffffff;
+  animation: pulse-red-badge 1.8s infinite;
+}
+
+@keyframes pulse-red-badge {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.btn-complete-maint {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  transition: var(--transition-fast);
+}
+
+.btn-complete-maint:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
 .maint-card-header {
   display: flex;
   align-items: center;

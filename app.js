@@ -23,21 +23,23 @@ const state = {
   maintenanceRecords: []
 };
 
-// 來自「公務車事件紀錄.xlsx」之歷史保養與事件數據
+// 來自「公務車事件紀錄.xlsx」之歷史保養與事件數據 (含待處理任務)
 const EXCEL_IMPORTED_MAINTENANCE_RECORDS = [
-  { id: "maint-1", date: "2026-06-24 12:26", category: "維修", title: "公務車開去李依師檢查", content: "清潔空氣幫 在觀察" },
-  { id: "maint-2", date: "2026-03-06 16:27", category: "保養", title: "9:30 公務車保養", content: "已保養完成" },
-  { id: "maint-3", date: "2025-12-02 01:28", category: "維修", title: "公務車多媒體面板無反應，倒車小心!!", content: "12/2 A 已修復OK\n1、旭益檢查源頭有電源但接上主機沒電源判斷為主機問題，報價主機13000，倒車鏡頭可延用\n2、到另一家勁聲汽車音響拆下主機去店內測試是好的，裝回車上後就都好了，檢修費200，另報價主機13800" },
-  { id: "maint-4", date: "2025-05-06 09:36", category: "驗車", title: "公務車驗車", content: "5/6 a  done." },
-  { id: "maint-5", date: "2025-03-19 09:45", category: "保養", title: "早上10:30 公務車保養", content: "" },
-  { id: "maint-6", date: "2025-03-12 14:51", category: "維修", title: "公務車右大燈壞掉", content: "3/10 a 已去原廠更換" },
-  { id: "maint-7", date: "2025-02-17 20:05", category: "狀況備註", title: "P1 公務車 車位在 B1  3  10", content: "" },
-  { id: "maint-8", date: "2024-12-05 17:14", category: "驗車", title: "公務車alz-3759  驗車完成，下次驗114年5月", content: "12/5 a done" },
-  { id: "maint-9", date: "2024-04-13 08:46", category: "保養", title: "公務車保養", content: "已預約2024/4/15 09:30進場" },
-  { id: "maint-10", date: "2023-05-09 17:28", category: "驗車", title: "公務車3759 驗車  5/28 到期", content: "5/9 a  已驗。" },
-  { id: "maint-11", date: "2023-05-09 17:22", category: "維修", title: "已約公務車  13:00  進廠更換 1.後輪煞車皮及骨  2.引擎蓋防漏油墊片   費用: 13972", content: "" },
-  { id: "maint-12", date: "2023-04-23 08:02", category: "保養", title: "公務車172500左右可以準備進場保養 (現在172590)", content: "4/24 已約4/25 15:00 黃先生" },
-  { id: "maint-13", date: "2023-02-17 18:48", category: "維修", title: "公務車左後輪插到釘子 已補胎完成", content: "" }
+  { id: "maint-pending-1", date: "2026-08-14 10:00", category: "維修", title: "ABC-1234 前輪胎磨損估價中", content: "已請原廠開立估價單，待主管批示後安排進場更換", status: "PENDING" },
+  { id: "maint-pending-2", date: "2026-08-15 14:00", category: "驗車", title: "公務車定期安全檢驗 (8/25 到期)", content: "請攜帶行車執照與保險卡至特約代檢廠辦理驗車", status: "PENDING" },
+  { id: "maint-1", date: "2026-06-24 12:26", category: "維修", title: "公務車開去李依師檢查", content: "清潔空氣幫 在觀察", status: "COMPLETED" },
+  { id: "maint-2", date: "2026-03-06 16:27", category: "保養", title: "9:30 公務車保養", content: "已保養完成", status: "COMPLETED" },
+  { id: "maint-3", date: "2025-12-02 01:28", category: "維修", title: "公務車多媒體面板無反應，倒車小心!!", content: "12/2 A 已修復OK\n1、旭益檢查源頭有電源但接上主機沒電源判斷為主機問題，報價主機13000，倒車鏡頭可延用\n2、到另一家勁聲汽車音響拆下主機去店內測試是好的，裝回車上後就都好了，檢修費200，另報價主機13800", status: "COMPLETED" },
+  { id: "maint-4", date: "2025-05-06 09:36", category: "驗車", title: "公務車驗車", content: "5/6 a  done.", status: "COMPLETED" },
+  { id: "maint-5", date: "2025-03-19 09:45", category: "保養", title: "早上10:30 公務車保養", content: "", status: "COMPLETED" },
+  { id: "maint-6", date: "2025-03-12 14:51", category: "維修", title: "公務車右大燈壞掉", content: "3/10 a 已去原廠更換", status: "COMPLETED" },
+  { id: "maint-7", date: "2025-02-17 20:05", category: "狀況備註", title: "P1 公務車 車位在 B1  3  10", content: "", status: "COMPLETED" },
+  { id: "maint-8", date: "2024-12-05 17:14", category: "驗車", title: "公務車alz-3759  驗車完成，下次驗114年5月", content: "12/5 a done", status: "COMPLETED" },
+  { id: "maint-9", date: "2024-04-13 08:46", category: "保養", title: "公務車保養", content: "已預約2024/4/15 09:30進場", status: "COMPLETED" },
+  { id: "maint-10", date: "2023-05-09 17:28", category: "驗車", title: "公務車3759 驗車  5/28 到期", content: "5/9 a  已驗。", status: "COMPLETED" },
+  { id: "maint-11", date: "2023-05-09 17:22", category: "維修", title: "已約公務車  13:00  進廠更換 1.後輪煞車皮及骨  2.引擎蓋防漏油墊片   費用: 13972", content: "", status: "COMPLETED" },
+  { id: "maint-12", date: "2023-04-23 08:02", category: "保養", title: "公務車172500左右可以準備進場保養 (現在172590)", content: "4/24 已約4/25 15:00 黃先生", status: "COMPLETED" },
+  { id: "maint-13", date: "2023-02-17 18:48", category: "維修", title: "公務車左後輪插到釘子 已補胎完成", content: "", status: "COMPLETED" }
 ];
 
 // 預設固定公務車輛

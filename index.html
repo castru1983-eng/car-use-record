@@ -171,7 +171,10 @@
             </p>
           </div>
 
-          <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-warning" id="btnOpenAddPending" style="background: #f59e0b; color: #ffffff; font-weight: 700; border: none; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);">
+              <i class="fa-solid fa-clock-rotate-left"></i> 新增待處理事件
+            </button>
             <button class="btn btn-primary" id="btnOpenAddMaint">
               <i class="fa-solid fa-plus"></i> 新增保養/事件紀錄
             </button>
@@ -185,8 +188,11 @@
             <input type="text" class="input-control" id="searchMaintInput" placeholder="搜尋保養、驗車、維修或關鍵字..." style="padding-left: 2.3rem; width: 100%;">
           </div>
 
-          <div style="display: flex; gap: 0.4rem;" id="maintCategoryChips">
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="maintCategoryChips">
             <button class="btn btn-secondary btn-maint-filter active" data-cat="ALL" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">全部紀錄</button>
+            <button class="btn btn-secondary btn-maint-filter" data-cat="待處理" id="btnFilterPending" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; font-weight: 700;">
+              ⏳ 待處理 <span id="pendingCountBadge" class="pending-count-badge">0</span>
+            </button>
             <button class="btn btn-secondary btn-maint-filter" data-cat="維修" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">🔧 維修</button>
             <button class="btn btn-secondary btn-maint-filter" data-cat="保養" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">⚙️ 保養</button>
             <button class="btn btn-secondary btn-maint-filter" data-cat="驗車" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">📋 驗車</button>
@@ -469,7 +475,7 @@
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">日期與時間 <span class="required">*</span></label>
-            <input type="datetime-local" class="input-control" id="maintDate" required>
+            <input type="datetime-local" class="input-control" id="maintDate" step="1" required>
           </div>
 
           <div class="form-group">
@@ -479,6 +485,14 @@
               <option value="維修">🔧 設備維修 / 故障排除</option>
               <option value="驗車">📋 定期驗車紀錄</option>
               <option value="狀況備註">🅿️ 車況 / 停車位備註</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">處理狀態 <span class="required">*</span></label>
+            <select class="select-control" id="maintStatus" required>
+              <option value="COMPLETED">✅ 已處理完成 (歸類進入正式紀錄庫)</option>
+              <option value="PENDING">⏳ 待處理 (顯示醒目提醒卡片)</option>
             </select>
           </div>
 
@@ -549,6 +563,6 @@
   </div>
 
   <!-- JavaScript 主邏輯 -->
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
