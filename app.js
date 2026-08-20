@@ -44,7 +44,7 @@ const state = {
 
 // 來自「公務車事件紀錄.xlsx」之歷史保養與事件數據 (含待處理任務)
 const EXCEL_IMPORTED_MAINTENANCE_RECORDS = [
-  { id: "maint-pending-1", date: "2026-08-14 10:00", category: "維修", title: "ABC-1234 前輪胎磨損估價中", content: "已請原廠開立估價單，待主管批示後安排進場更換", status: "PENDING" },
+  { id: "maint-pending-1", date: "2026-08-14 10:00", category: "維修", title: "ALZ-3759 前輪胎磨損估價中", content: "已請原廠開立估價單，待主管批示後安排進場更換", status: "PENDING" },
   { id: "maint-pending-2", date: "2026-08-15 14:00", category: "驗車", title: "公務車定期安全檢驗 (8/25 到期)", content: "請攜帶行車執照與保險卡至特約代檢廠辦理驗車", status: "PENDING" },
   { id: "maint-1", date: "2026-06-24 12:26", category: "維修", title: "公務車開去李依師檢查", content: "清潔空氣幫 在觀察", status: "COMPLETED" },
   { id: "maint-2", date: "2026-03-06 16:27", category: "保養", title: "9:30 公務車保養", content: "已保養完成", status: "COMPLETED" },
@@ -137,7 +137,7 @@ function getMockRecords() {
     {
       id: 'rec-101',
       carId: 'v1',
-      plate: 'ABC-1234',
+      plate: 'ALZ-3759',
       date: formatDate(-2),
       driver: '林大為',
       department: '總務課',
@@ -1193,8 +1193,16 @@ document.addEventListener('DOMContentLoaded', () => {
       c.classList.toggle('active', c.getAttribute('data-shift') === '早班');
     });
 
-    // 預設車輛為 v1
-    document.getElementById('formCarId').value = state.vehicles[0] ? state.vehicles[0].id : 'v1';
+    // 取得當前選擇或預設的公務車資訊
+    const currentCar = state.vehicles.find(v => v.id === (state.selectedCarId !== 'ALL' ? state.selectedCarId : (state.vehicles[0] ? state.vehicles[0].id : 'v1'))) || state.vehicles[0];
+    const carId = currentCar ? currentCar.id : 'v1';
+    const carPlate = currentCar ? currentCar.plate : 'ALZ-3759';
+
+    document.getElementById('formCarId').value = carId;
+    const elSignCar = document.getElementById('displaySignCar');
+    if (elSignCar) {
+      elSignCar.innerHTML = `<i class="fa-solid fa-car-side"></i> 公務車 (${carPlate})`;
+    }
 
     // 填入駕駛與同行乘客選單
     populateDriverAndPassengerOptions();
@@ -1262,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newRecord = {
       id: 'rec-' + Date.now(),
       carId: carId,
-      plate: vehicle ? vehicle.plate : 'ABC-1234',
+      plate: vehicle ? vehicle.plate : 'ALZ-3759',
       date: document.getElementById('formDate').value,
       shift: shiftVal,
       driver: driverVal,
@@ -1324,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const shiftText = rec.shift || '早班';
 
     document.getElementById('detailHeaderBox').innerHTML = `
-      <span><i class="fa-solid fa-car-side" style="color: var(--primary-color);"></i> 公務車 (${rec.plate || 'ABC-1234'})</span>
+      <span><i class="fa-solid fa-car-side" style="color: var(--primary-color);"></i> 公務車 (${rec.plate || 'ALZ-3759'})</span>
       <span style="color: var(--primary-color);">${rec.date} ${shiftIcon} ${shiftText}</span>
     `;
 
