@@ -635,25 +635,10 @@ function renderFuelCardManagement() {
 
   // 更新紙本抬頭預覽卡片資訊
   const previewPlate = document.getElementById('previewFuelPlate');
-  const previewMaint = document.getElementById('previewFuelMaintMileage');
-  const previewYM = document.getElementById('previewFuelYearMonth');
 
   let selectedVehicle = state.vehicles.find(v => v.id === selectedCarId);
   if (previewPlate) {
     previewPlate.innerText = selectedVehicle ? selectedVehicle.plate : (selectedCarId === 'ALL' ? '全部車輛' : '未選擇');
-  }
-  if (previewMaint) {
-    previewMaint.innerText = selectedVehicle && selectedVehicle.maintMileage ? `${Number(selectedVehicle.maintMileage).toLocaleString()} km` : (state.vehicles[0] && state.vehicles[0].maintMileage ? `${Number(state.vehicles[0].maintMileage).toLocaleString()} km` : '50,000 km');
-  }
-  if (previewYM) {
-    if (selectedMonth) {
-      const [y, m] = selectedMonth.split('-');
-      const rocY = parseInt(y) - 1911;
-      previewYM.innerText = `${rocY} 年 ${m} 月 (${y}年${m}月)`;
-    } else {
-      const now = new Date();
-      previewYM.innerText = `${now.getFullYear() - 1911} 年 ${String(now.getMonth() + 1).padStart(2, '0')} 月`;
-    }
   }
 
   // 1. 計算車隊總油卡餘額
@@ -2085,8 +2070,9 @@ document.addEventListener('DOMContentLoaded', () => {
       rocYearStr = `${y - 1911}`;
     }
 
-    // 篩選加油交易（僅包含加油扣款與儲值紀錄）
+    // 篩選加油交易（僅包含加油扣款紀錄，排除儲值）
     let filteredTx = state.fuelTransactions.filter(tx => {
+      if (tx.type !== 'EXPENSE') return false; // 只顯示加油扣款，不顯示儲值
       if (selectedCarId !== 'ALL' && tx.carId !== selectedCarId) return false;
       if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
       return true;
@@ -2169,9 +2155,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </table>
   <table class="meta-table">
     <tr>
-      <td style="text-align: left; width: 33%;">車號：${plate}</td>
-      <td style="text-align: center; width: 34%;">保養里程數：${maintMileageStr}</td>
-      <td style="text-align: right; width: 33%;">${rocYearStr} 年 ${targetMonthStr} 月</td>
+      <td colspan="6" style="text-align: left; font-size: 14pt; font-weight: bold; padding: 4px;">車號：${plate}</td>
     </tr>
   </table>
   <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
