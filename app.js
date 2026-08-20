@@ -1096,6 +1096,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     state.activeView = targetId;
+
+    // 頂部控制列 (toolbar) 僅在「月曆簽到視圖」及「使用紀錄清單」頁面顯示，切換到其他頁面自動隱藏
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+      if (targetId === 'calendarView' || targetId === 'tableView') {
+        toolbar.classList.remove('hidden');
+      } else {
+        toolbar.classList.add('hidden');
+      }
+    }
   };
 
   // 強制確保無論透過電腦或手機開啟連結，均預設載入「月曆簽到視圖」
