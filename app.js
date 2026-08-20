@@ -69,7 +69,7 @@ const EXCEL_IMPORTED_FUEL_TRANSACTIONS = [
 
 // 預設固定公務車輛
 const DEFAULT_VEHICLES = [
-  { id: 'v1', plate: 'ALZ-3759', model: '公務車 (Toyota Altis)', type: '轎車', mileage: 42850, status: 'AVAILABLE', fuelCardNo: '中油捷利卡 #8839-2041', fuelCardBalance: 3500 }
+  { id: 'v1', plate: 'ALZ-3759', model: '公務車 (Toyota Altis)', type: '轎車', mileage: 42850, maintMileage: 50000, status: 'AVAILABLE', fuelCardNo: '中油捷利卡 #8839-2041', fuelCardBalance: 3500 }
 ];
 
 // 產生預設簽名 Data URL 示範圖片 (簡單 Canvas 產生文字樣式簽名)
@@ -609,6 +609,53 @@ function renderFuelCardManagement() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  // 車輛與月份篩選元件初始化與動態同步
+  const selectCarEl = document.getElementById('fuelCarFilterSelect');
+  const monthPickerEl = document.getElementById('fuelMonthPicker');
+
+  if (selectCarEl) {
+    const currentVal = selectCarEl.value || 'ALL';
+    selectCarEl.innerHTML = `<option value="ALL">🚗 全部車輛</option>`;
+    state.vehicles.forEach(v => {
+      selectCarEl.innerHTML += `<option value="${v.id}" ${currentVal === v.id ? 'selected' : ''}>${v.plate} (${v.model})</option>`;
+    });
+    selectCarEl.onchange = renderFuelCardManagement;
+  }
+
+  if (monthPickerEl && !monthPickerEl.value) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    monthPickerEl.value = `${y}-${m}`;
+    monthPickerEl.onchange = renderFuelCardManagement;
+  }
+
+  const selectedCarId = selectCarEl ? selectCarEl.value : 'ALL';
+  const selectedMonth = monthPickerEl ? monthPickerEl.value : '';
+
+  // 更新紙本抬頭預覽卡片資訊
+  const previewPlate = document.getElementById('previewFuelPlate');
+  const previewMaint = document.getElementById('previewFuelMaintMileage');
+  const previewYM = document.getElementById('previewFuelYearMonth');
+
+  let selectedVehicle = state.vehicles.find(v => v.id === selectedCarId);
+  if (previewPlate) {
+    previewPlate.innerText = selectedVehicle ? selectedVehicle.plate : (selectedCarId === 'ALL' ? '全部車輛' : '未選擇');
+  }
+  if (previewMaint) {
+    previewMaint.innerText = selectedVehicle && selectedVehicle.maintMileage ? `${Number(selectedVehicle.maintMileage).toLocaleString()} km` : (state.vehicles[0] && state.vehicles[0].maintMileage ? `${Number(state.vehicles[0].maintMileage).toLocaleString()} km` : '50,000 km');
+  }
+  if (previewYM) {
+    if (selectedMonth) {
+      const [y, m] = selectedMonth.split('-');
+      const rocY = parseInt(y) - 1911;
+      previewYM.innerText = `${rocY} 年 ${m} 月 (${y}年${m}月)`;
+    } else {
+      const now = new Date();
+      previewYM.innerText = `${now.getFullYear() - 1911} 年 ${String(now.getMonth() + 1).padStart(2, '0')} 月`;
+    }
+  }
+
   // 1. 計算車隊總油卡餘額
   const totalBalance = state.vehicles.reduce((acc, v) => acc + (v.fuelCardBalance || 0), 0);
   const elTotalBal = document.getElementById('statTotalFuelBalance');
@@ -621,22 +668,27 @@ function renderFuelCardManagement() {
 
   // 3. 計算本月加油總花費
   const now = new Date();
-  const currentY = now.getFullYear();
-  const currentM = now.getMonth();
   const monthExpenses = state.fuelTransactions.filter(tx => {
     if (tx.type !== 'EXPENSE') return false;
-    const d = new Date(tx.date);
-    return d.getFullYear() === currentY && d.getMonth() === currentM;
+    if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
+    return true;
   }).reduce((acc, tx) => acc + (tx.amount || 0), 0);
   const elMonthExp = document.getElementById('statMonthFuelExpense');
   if (elMonthExp) elMonthExp.innerText = `NT$ ${monthExpenses.toLocaleString()}`;
 
-  if (state.fuelTransactions.length === 0) {
+  // 4. 依條件篩選加油/儲值明細
+  let filteredTx = state.fuelTransactions.filter(tx => {
+    if (selectedCarId !== 'ALL' && tx.carId !== selectedCarId) return false;
+    if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
+    return true;
+  });
+
+  if (filteredTx.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
           <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-light); display: block;"></i>
-          尚無油卡加值或加油扣款異動紀錄
+          目前條件下尚無加油或儲值異動紀錄
         </td>
       </tr>
     `;
@@ -644,7 +696,7 @@ function renderFuelCardManagement() {
   }
 
   // 排序：最新交易在最上面
-  const sortedTx = [...state.fuelTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedTx = [...filteredTx].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   sortedTx.forEach(tx => {
     const vehicle = state.vehicles.find(v => v.id === tx.carId);
@@ -652,28 +704,24 @@ function renderFuelCardManagement() {
     
     const isTopUp = tx.type === 'TOPUP';
     const typeBadge = isTopUp 
-      ? `<span style="background:#d1fae5; color:#059669; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">🟢 油卡儲值</span>`
-      : `<span style="background:#fee2e2; color:#dc2626; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">⛽ 加油扣款</span>`;
+      ? `<span style="background:#d1fae5; color:#059669; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">🟢 儲值</span>`
+      : `<span style="background:#fee2e2; color:#dc2626; padding:0.2rem 0.55rem; border-radius:4px; font-size:0.8rem; font-weight:700;">⛽ 加油</span>`;
 
     const amtStr = isTopUp ? `+ NT$ ${tx.amount.toLocaleString()}` : `- NT$ ${tx.amount.toLocaleString()}`;
     const amtColor = isTopUp ? '#059669' : '#dc2626';
 
     const mileageDisplay = tx.mileage ? `${Number(tx.mileage).toLocaleString()} km` : '-';
-    
-    let personNoteDisplay = `<div style="font-weight:700; color:#1e293b;"><i class="fa-solid fa-user-circle" style="color:var(--primary-color);"></i> ${tx.person || '未紀錄人員'}</div>`;
-    if (tx.note) {
-      personNoteDisplay += `<div style="font-size:0.78rem; color:#64748b;">${tx.note}</div>`;
-    }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><div style="font-weight:700;">${tx.date}</div></td>
       <td>${carInfo}</td>
       <td>${typeBadge}</td>
-      <td><span style="font-weight:700; color:${amtColor};">${amtStr}</span></td>
       <td><span style="font-weight:600; color:#334155;">${mileageDisplay}</span></td>
+      <td><span style="font-weight:700; color:${amtColor};">${amtStr}</span></td>
       <td><strong>NT$ ${(tx.balanceAfter || 0).toLocaleString()}</strong></td>
-      <td>${personNoteDisplay}</td>
+      <td><div style="font-weight:700; color:#1e293b;"><i class="fa-solid fa-user-circle" style="color:var(--primary-color);"></i> ${tx.person || '未紀錄'}</div></td>
+      <td><div style="font-size:0.85rem; color:#475569;">${tx.note || '-'}</div></td>
       <td style="text-align: right;">
         <button class="btn btn-icon btn-delete-fuel-tx" data-id="${tx.id}" title="刪除此筆交易">
           <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
@@ -1999,15 +2047,169 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ------------------------------------------------------------------------
-  // G. 報表 CSV 匯出與整月日曆列印
+  // G. 報表 Excel / CSV 匯出與整月日曆列印
   // ------------------------------------------------------------------------
-  document.getElementById('btnExportCsv').addEventListener('click', () => {
+
+  // 1. 依照紙本格式匯出「加油紀錄 Excel 表 (.xls)」
+  function exportFuelExcelTable(carIdFilter = '', monthFilter = '') {
+    const selectCarEl = document.getElementById('fuelCarFilterSelect');
+    const monthPickerEl = document.getElementById('fuelMonthPicker');
+
+    const selectedCarId = carIdFilter || (selectCarEl ? selectCarEl.value : 'ALL');
+    const selectedMonth = monthFilter || (monthPickerEl ? monthPickerEl.value : '');
+
+    let selectedVehicle = state.vehicles.find(v => v.id === selectedCarId);
+    if (!selectedVehicle && state.vehicles.length > 0) {
+      selectedVehicle = state.vehicles[0];
+    }
+
+    const plate = selectedVehicle ? selectedVehicle.plate : (selectedCarId === 'ALL' ? '全部公務車' : '');
+    const maintMileage = selectedVehicle ? (selectedVehicle.maintMileage || 50000) : 50000;
+    const maintMileageStr = maintMileage ? Number(maintMileage).toLocaleString() : '';
+
+    let targetYearStr = '';
+    let targetMonthStr = '';
+    let rocYearStr = '';
+
+    if (selectedMonth) {
+      const [y, m] = selectedMonth.split('-');
+      targetYearStr = y;
+      targetMonthStr = m;
+      rocYearStr = `${parseInt(y) - 1911}`;
+    } else {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      targetYearStr = `${y}`;
+      targetMonthStr = m;
+      rocYearStr = `${y - 1911}`;
+    }
+
+    // 篩選加油交易（僅包含加油扣款與儲值紀錄）
+    let filteredTx = state.fuelTransactions.filter(tx => {
+      if (selectedCarId !== 'ALL' && tx.carId !== selectedCarId) return false;
+      if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
+      return true;
+    });
+
+    // 依時間由舊到新排序 (符合紙本填寫順序)
+    filteredTx.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // 產生表格 Data 行 (欄位完全對應圖片紙本格式：日期, 里程數, 加油金額, 剩餘金額, 記錄者, 車況)
+    let dataRowsHtml = '';
+    filteredTx.forEach(tx => {
+      const dateShort = tx.date ? tx.date.split(' ')[0] : '';
+      const mileageVal = tx.mileage ? Number(tx.mileage).toLocaleString() : '';
+      const amountVal = tx.amount ? Number(tx.amount).toLocaleString() : '';
+      const balanceVal = (tx.balanceAfter !== undefined && tx.balanceAfter !== null) ? Number(tx.balanceAfter).toLocaleString() : '';
+      const personVal = tx.person || '';
+      const noteVal = tx.note || '';
+
+      dataRowsHtml += `
+        <tr>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt;">${dateShort}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: right; height: 32px; font-size: 11pt;">${mileageVal}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: right; height: 32px; font-size: 11pt;">${amountVal}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: right; height: 32px; font-size: 11pt;">${balanceVal}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt;">${personVal}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: left; height: 32px; font-size: 11pt;">${noteVal}</td>
+        </tr>
+      `;
+    });
+
+    // 補齊紙本空白列至至少 20 列 (方便印出列印紙本填寫)
+    const minRows = Math.max(20, filteredTx.length);
+    for (let i = filteredTx.length; i < minRows; i++) {
+      dataRowsHtml += `
+        <tr>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+          <td style="border: 1pt solid #000000; padding: 6px; height: 32px;"></td>
+        </tr>
+      `;
+    }
+
+    // 組合完整 Excel 網頁表格 (含 MSO XML 樣式標頭)
+    const excelTemplate = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]>
+<xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>加油紀錄表</x:Name>
+    <x:WorksheetOptions>
+     <x:DisplayGridlines/>
+    </x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  body { font-family: "標楷體", "微軟正黑體", Arial, sans-serif; }
+  .title-table { width: 100%; border: none; margin-bottom: 5px; }
+  .title-table td { border: none; font-size: 18pt; font-weight: bold; text-align: center; vertical-align: middle; }
+  .meta-table { width: 100%; border: none; margin-bottom: 8px; font-size: 13pt; font-weight: bold; }
+  .meta-table td { border: none; padding: 4px; vertical-align: middle; }
+  .grid-table { width: 100%; border-collapse: collapse; text-align: center; }
+  .grid-table th { border: 1.5pt solid #000000; background-color: #e2e8f0; font-size: 13pt; font-weight: bold; padding: 8px; height: 36px; vertical-align: middle; }
+  .grid-table td { border: 1pt solid #000000; font-size: 11pt; padding: 6px; height: 32px; vertical-align: middle; }
+</style>
+</head>
+<body>
+  <table class="title-table">
+    <tr>
+      <td colspan="6" style="font-size: 18pt; font-weight: bold; text-align: center; padding: 10px;">公務車加油紀錄表</td>
+    </tr>
+  </table>
+  <table class="meta-table">
+    <tr>
+      <td style="text-align: left; width: 33%;">車號：${plate}</td>
+      <td style="text-align: center; width: 34%;">保養里程數：${maintMileageStr}</td>
+      <td style="text-align: right; width: 33%;">${rocYearStr} 年 ${targetMonthStr} 月</td>
+    </tr>
+  </table>
+  <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
+    <thead>
+      <tr>
+        <th style="width: 14%;">日 期</th>
+        <th style="width: 16%;">里 程 數</th>
+        <th style="width: 16%;">加 油 金 額</th>
+        <th style="width: 16%;">剩 餘 金 額</th>
+        <th style="width: 15%;">記 錄 者</th>
+        <th style="width: 23%;">車況 ex:左後方燈罩下有...</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dataRowsHtml}
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const filename = `公務車加油紀錄表_${plate}_${targetYearStr}${targetMonthStr}.xls`;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // 2. 匯出「簽到紀錄 CSV 報表」
+  function exportSignInRecordsCsv() {
     if (state.records.length === 0) {
-      alert('目前無任何紀錄可匯出');
+      alert('目前無任何簽到紀錄可匯出');
       return;
     }
 
-    // CSV Header (UTF-8 BOM 加入預防 Excel 簡繁亂碼)
     let csvContent = "\uFEFF單號,用車日期,車牌號碼,駕駛人,部門,目的地,事由,時段,出發里程(km),歸還里程(km),累積行駛(km),狀態,油電狀態,同行人員\n";
 
     state.records.forEach(r => {
@@ -2038,10 +2240,55 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  });
+  }
+
+  // 匯出彈窗控制 Modal
+  const modalExportChoice = document.getElementById('modalExportChoice');
+  const btnExportCsv = document.getElementById('btnExportCsv');
+  const btnCloseExportModal = document.getElementById('btnCloseExportModal');
+  const btnCancelExportModal = document.getElementById('btnCancelExportModal');
+
+  if (btnExportCsv && modalExportChoice) {
+    btnExportCsv.addEventListener('click', () => {
+      modalExportChoice.classList.add('active');
+    });
+  }
+
+  if (btnCloseExportModal && modalExportChoice) {
+    btnCloseExportModal.addEventListener('click', () => modalExportChoice.classList.remove('active'));
+  }
+  if (btnCancelExportModal && modalExportChoice) {
+    btnCancelExportModal.addEventListener('click', () => modalExportChoice.classList.remove('active'));
+  }
+
+  // 彈窗內的兩個匯出選項按鈕
+  const btnExportFuelExcelModal = document.getElementById('btnExportFuelExcelModal');
+  if (btnExportFuelExcelModal) {
+    btnExportFuelExcelModal.addEventListener('click', () => {
+      exportFuelExcelTable();
+      if (modalExportChoice) modalExportChoice.classList.remove('active');
+    });
+  }
+
+  const btnExportSignInCsvModal = document.getElementById('btnExportSignInCsvModal');
+  if (btnExportSignInCsvModal) {
+    btnExportSignInCsvModal.addEventListener('click', () => {
+      exportSignInRecordsCsv();
+      if (modalExportChoice) modalExportChoice.classList.remove('active');
+    });
+  }
+
+  // 油卡頁面的專用匯出 Excel 按鈕
+  const btnExportFuelExcel = document.getElementById('btnExportFuelExcel');
+  if (btnExportFuelExcel) {
+    btnExportFuelExcel.addEventListener('click', () => {
+      exportFuelExcelTable();
+    });
+  }
 
   // 一鍵列印
   document.getElementById('btnPrintCalendar').addEventListener('click', () => {
     window.print();
   });
 });
+

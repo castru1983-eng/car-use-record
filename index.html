@@ -185,9 +185,12 @@
             </p>
           </div>
 
-          <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
             <button class="btn btn-primary" id="btnOpenAddFuelTx" style="background: #059669; border-color: #059669;">
               <i class="fa-solid fa-gas-pump"></i> 新增加油 / 儲值異動紀錄
+            </button>
+            <button class="btn btn-secondary" id="btnExportFuelExcel" style="background: #047857; color: #ffffff; border-color: #047857;">
+              <i class="fa-solid fa-file-excel"></i> 匯出加油紀錄 Excel 表 (依紙本格式)
             </button>
           </div>
         </div>
@@ -225,18 +228,42 @@
           </div>
         </div>
 
+        <!-- 紙本表格篩選與抬頭動態預覽列 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; background: var(--bg-main); padding: 0.85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">車輛：</label>
+              <select class="select-control" id="fuelCarFilterSelect" style="padding: 0.35rem 0.65rem; font-size: 0.85rem; min-width: 170px;">
+                <option value="ALL">🚗 全部車輛</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">月份：</label>
+              <input type="month" class="input-control" id="fuelMonthPicker" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;">
+            </div>
+          </div>
+
+          <!-- 紙本表格抬頭預覽標籤 -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.85rem; display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap;">
+            <div><strong>車號：</strong><span id="previewFuelPlate" style="color: #0284c7; font-weight: 700;">ALL</span></div>
+            <div><strong>保養里程數：</strong><span id="previewFuelMaintMileage" style="color: #059669; font-weight: 700;">-</span></div>
+            <div><strong>年 月：</strong><span id="previewFuelYearMonth" style="color: #475569; font-weight: 700;">2026年08月</span></div>
+          </div>
+        </div>
+
         <!-- 油卡交易歷史清單表格 -->
         <div style="overflow-x: auto;">
           <table class="data-table" style="width: 100%;">
             <thead>
               <tr>
-                <th>交易時間</th>
+                <th>日期</th>
                 <th>車輛 / 油卡卡號</th>
-                <th>異動類別</th>
+                <th>類別</th>
+                <th>里程數</th>
                 <th>加油金額</th>
-                <th>加油里程</th>
                 <th>剩餘金額</th>
-                <th>加油人員 / 備註</th>
+                <th>記錄者</th>
+                <th>車況 (備註)</th>
                 <th style="text-align: right;">操作</th>
               </tr>
             </thead>
@@ -590,6 +617,11 @@
           </div>
 
           <div class="form-group">
+            <label class="form-label">保養里程數 (km) <span style="font-size:0.78rem; color:var(--text-muted); font-weight:normal;">(紙本加油表標頭「保養里程數」)</span></label>
+            <input type="number" class="input-control" id="vehicleMaintMileage" placeholder="例：50000" min="0" value="50000">
+          </div>
+
+          <div class="form-group">
             <label class="form-label">綁定油卡卡號 (Fuel Card No.)</label>
             <input type="text" class="input-control" id="vehicleFuelCardNo" placeholder="例：中油加油卡 #8839-2041">
           </div>
@@ -678,8 +710,8 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">備註</label>
-            <input type="text" class="input-control" id="fuelTxNote" placeholder="例：台灣中油西屯站、發票號碼、特別說明...">
+            <label class="form-label">車況 / 備註 <span style="font-size:0.78rem; color:var(--text-muted); font-weight:normal;">(紙本表格之「車況」)</span></label>
+            <input type="text" class="input-control" id="fuelTxNote" placeholder="ex: 左後方燈罩下有... / 站名發票說明">
           </div>
         </div>
 
@@ -796,6 +828,44 @@
       </div>
       <div style="text-align: center;">
         <img id="lightboxImg" src="" alt="照片檢視" style="max-width: 100%; max-height: 75vh; border-radius: var(--radius-md); object-fit: contain;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       彈窗 Modal 7: 匯出報表類別選擇彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalExportChoice">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i class="fa-solid fa-file-export" style="color: var(--primary-color);"></i> 選擇匯出報表格式
+        </h3>
+        <button class="btn-close-modal" id="btnCloseExportModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="gap: 1rem;">
+        <button type="button" class="btn btn-primary" id="btnExportFuelExcelModal" style="background: #047857; border-color: #047857; padding: 0.85rem 1rem; display: flex; align-items: center; justify-content: space-between; text-align: left; width: 100%;">
+          <div>
+            <div style="font-weight: 700; font-size: 1rem;"><i class="fa-solid fa-file-excel"></i> 匯出「加油紀錄 Excel 表」</div>
+            <div style="font-size: 0.8rem; font-weight: normal; opacity: 0.9; margin-top: 0.2rem;">依紙本表單格式 (含車號、保養里程數、年月、日期、里程數、加油金額、剩餘金額、記錄者、車況)</div>
+          </div>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+
+        <button type="button" class="btn btn-secondary" id="btnExportSignInCsvModal" style="padding: 0.85rem 1rem; display: flex; align-items: center; justify-content: space-between; text-align: left; width: 100%;">
+          <div>
+            <div style="font-weight: 700; font-size: 1rem; color: var(--text-main);"><i class="fa-solid fa-file-csv"></i> 匯出「公務車出勤簽到紀錄報表」</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">匯出 CSV/Excel 格式全年度出車班別、駕駛、目的地與里程紀錄</div>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
+        </button>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnCancelExportModal">關閉</button>
       </div>
     </div>
   </div>
