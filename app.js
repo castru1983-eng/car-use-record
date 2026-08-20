@@ -1179,18 +1179,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // 依當前時間計算跨日晚班與預設日期/班別 (20:00~隔天08:00 歸屬當日晚班)
+  const getDefaultSignInfo = (presetDate = '') => {
+    if (presetDate) {
+      return { date: presetDate, shift: '早班' };
+    }
+
+    const now = new Date();
+    const hours = now.getHours();
+
+    let signDateObj = new Date(now);
+    let defaultShift = '早班';
+
+    // 晚班跨日視窗：20:00 至 隔天 08:00
+    if (hours >= 20) {
+      // 20:00 ~ 23:59: 當天日期，自動切換為「晚班」
+      defaultShift = '晚班';
+    } else if (hours < 8) {
+      // 00:00 ~ 07:59 (隔天凌晨): 歸屬前一日(yesterday)之晚班
+      signDateObj.setDate(signDateObj.getDate() - 1);
+      defaultShift = '晚班';
+    } else {
+      // 08:00 ~ 19:59: 當天日期，自動選擇「早班」
+      defaultShift = '早班';
+    }
+
+    const y = signDateObj.getFullYear();
+    const m = String(signDateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(signDateObj.getDate()).padStart(2, '0');
+
+    return {
+      date: `${y}-${m}-${d}`,
+      shift: defaultShift
+    };
+  };
+
   const openRecordModal = (presetDate = '') => {
     formRecord.reset();
     document.getElementById('recordId').value = '';
 
-    const signDate = presetDate || new Date().toISOString().split('T')[0];
+    const signInfo = getDefaultSignInfo(presetDate);
+    const signDate = signInfo.date;
+    const defaultShift = signInfo.shift;
+
     document.getElementById('formDate').value = signDate;
     document.getElementById('displaySignDate').innerHTML = `<i class="fa-regular fa-calendar"></i> 簽到日期：${signDate}`;
     
-    // 預設重置班別為「早班」
-    document.getElementById('formShift').value = '早班';
+    // 依時間自動切換為「早班」或「晚班」
+    document.getElementById('formShift').value = defaultShift;
     document.querySelectorAll('.shift-chip').forEach(c => {
-      c.classList.toggle('active', c.getAttribute('data-shift') === '早班');
+      c.classList.toggle('active', c.getAttribute('data-shift') === defaultShift);
     });
 
     // 取得當前選擇或預設的公務車資訊
