@@ -860,6 +860,20 @@
           </div>
           <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
         </button>
+
+        <!-- 跨裝置資料備份與同步 -->
+        <div style="border-top: 1px solid var(--border-color); padding-top: 0.85rem; margin-top: 0.25rem; display: flex; flex-direction: column; gap: 0.6rem;">
+          <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);"><i class="fa-solid fa-arrows-rotate" style="color: var(--primary-color);"></i> 跨裝置資料備份與同步 (電腦 ↔ 手機)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn btn-secondary" id="btnExportBackupJson" style="flex: 1; padding: 0.5rem; font-size: 0.82rem;">
+              <i class="fa-solid fa-download"></i> 匯出 JSON 備份檔
+            </button>
+            <button type="button" class="btn btn-secondary" id="btnTriggerImportJson" style="flex: 1; padding: 0.5rem; font-size: 0.82rem;">
+              <i class="fa-solid fa-upload"></i> 匯入 JSON 備份檔
+            </button>
+            <input type="file" id="inputImportJson" accept=".json" style="display: none;">
+          </div>
+        </div>
       </div>
 
       <div class="modal-footer">

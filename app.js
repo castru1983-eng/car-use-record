@@ -6,11 +6,11 @@
 // ==========================================================================
 // 1. 初始化資料與狀態 Store
 // ==========================================================================
-const STORAGE_KEY_RECORDS = 'car_records_db_v9';
-const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v9';
-const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v9';
-const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v9';
-const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v9';
+const STORAGE_KEY_RECORDS = 'car_records_db_v10';
+const STORAGE_KEY_VEHICLES = 'car_vehicles_db_v10';
+const STORAGE_KEY_MAINTENANCE = 'car_maintenance_db_v10';
+const STORAGE_KEY_FUEL_TX = 'car_fuel_transactions_db_v10';
+const STORAGE_KEY_PERSONNEL = 'car_personnel_db_v10';
 
 const DEFAULT_PERSONNEL = [
   { id: 'p1', name: '林大為' },
@@ -204,6 +204,11 @@ function loadData() {
   const localVehicles = localStorage.getItem(STORAGE_KEY_VEHICLES);
   if (localVehicles) {
     state.vehicles = JSON.parse(localVehicles);
+    // 自動修復補齊舊快取的車輛欄位
+    state.vehicles.forEach(v => {
+      if (v.maintMileage === undefined) v.maintMileage = 50000;
+      if (v.fuelCardBalance === undefined) v.fuelCardBalance = 3500;
+    });
   } else {
     state.vehicles = DEFAULT_VEHICLES;
     saveVehicles();
@@ -2272,11 +2277,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 油卡頁面的專用匯出 Excel 按鈕
-  const btnExportFuelExcel = document.getElementById('btnExportFuelExcel');
-  if (btnExportFuelExcel) {
-    btnExportFuelExcel.addEventListener('click', () => {
-      exportFuelExcelTable();
+  // 3. JSON 跨裝置資料備份與匯入
+  const btnExportBackupJson = document.getElementById('btnExportBackupJson');
+  if (btnExportBackupJson) {
+    btnExportBackupJson.addEventListener('click', () => {
+      const fullData = {
+        version: '10',
+        exportedAt: new Date().toISOString(),
+        vehicles: state.vehicles,
+        records: state.records,
+        maintenanceRecords: state.maintenanceRecords,
+        fuelTransactions: state.fuelTransactions,
+        personnel: state.personnel
+      };
+      const jsonStr = JSON.stringify(fullData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `公務車簽到系統備份資料_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  const btnTriggerImportJson = document.getElementById('btnTriggerImportJson');
+  const inputImportJson = document.getElementById('inputImportJson');
+
+  if (btnTriggerImportJson && inputImportJson) {
+    btnTriggerImportJson.addEventListener('click', () => inputImportJson.click());
+
+    inputImportJson.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+          if (importedData.vehicles) state.vehicles = importedData.vehicles;
+          if (importedData.records) state.records = importedData.records;
+          if (importedData.maintenanceRecords) state.maintenanceRecords = importedData.maintenanceRecords;
+          if (importedData.fuelTransactions) state.fuelTransactions = importedData.fuelTransactions;
+          if (importedData.personnel) state.personnel = importedData.personnel;
+
+          saveVehicles();
+          saveRecords();
+          saveMaintenance();
+          saveFuelTransactions();
+          savePersonnel();
+
+          refreshApp();
+          if (modalExportChoice) modalExportChoice.classList.remove('active');
+          alert('✅ 跨裝置備份資料已成功匯入並同步！');
+        } catch (err) {
+          alert('❌ 備份檔案解析失敗，請確認檔案格式是否正確。');
+        }
+      };
+      reader.readAsText(file);
     });
   }
 
