@@ -686,17 +686,19 @@ function renderFuelCardManagement() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  // 車輛與月份篩選元件初始化與動態同步
-  const selectCarEl = document.getElementById('fuelCarFilterSelect');
+  // 油卡與月份篩選元件初始化與動態同步
+  const selectCardEl = document.getElementById('fuelCardFilterSelect');
   const monthPickerEl = document.getElementById('fuelMonthPicker');
 
-  if (selectCarEl) {
-    const currentVal = selectCarEl.value || 'ALL';
-    selectCarEl.innerHTML = `<option value="ALL">🚗 全部車輛</option>`;
-    state.vehicles.forEach(v => {
-      selectCarEl.innerHTML += `<option value="${v.id}" ${currentVal === v.id ? 'selected' : ''}>${v.plate} (${v.model})</option>`;
+  if (selectCardEl) {
+    const currentVal = selectCardEl.value || 'ALL';
+    selectCardEl.innerHTML = `<option value="ALL">💳 全部油卡 (${state.fuelCards.length})</option>`;
+    state.fuelCards.forEach(c => {
+      const boundV = state.vehicles.find(v => v.id === c.boundCarId);
+      const boundText = boundV ? ` [綁定 ${boundV.plate}]` : '';
+      selectCardEl.innerHTML += `<option value="${c.id}" ${currentVal === c.id ? 'selected' : ''}>${c.cardNo}${boundText}</option>`;
     });
-    selectCarEl.onchange = renderFuelCardManagement;
+    selectCardEl.onchange = renderFuelCardManagement;
   }
 
   if (monthPickerEl && !monthPickerEl.value) {
@@ -707,15 +709,15 @@ function renderFuelCardManagement() {
     monthPickerEl.onchange = renderFuelCardManagement;
   }
 
-  const selectedCarId = selectCarEl ? selectCarEl.value : 'ALL';
+  const selectedCardId = selectCardEl ? selectCardEl.value : 'ALL';
   const selectedMonth = monthPickerEl ? monthPickerEl.value : '';
 
   // 更新紙本抬頭預覽卡片資訊
   const previewPlate = document.getElementById('previewFuelPlate');
 
-  let selectedVehicle = state.vehicles.find(v => v.id === selectedCarId);
+  let selectedCard = state.fuelCards.find(c => c.id === selectedCardId);
   if (previewPlate) {
-    previewPlate.innerText = selectedVehicle ? selectedVehicle.plate : (selectedCarId === 'ALL' ? '全部車輛' : '未選擇');
+    previewPlate.innerText = selectedCard ? selectedCard.cardNo : (selectedCardId === 'ALL' ? '全部實體油卡' : '未選擇');
   }
 
   // 渲染實體油卡清單卡片 (#fuelCardsGrid)
@@ -741,9 +743,13 @@ function renderFuelCardManagement() {
   const elMonthExp = document.getElementById('statMonthFuelExpense');
   if (elMonthExp) elMonthExp.innerText = `NT$ ${monthExpenses.toLocaleString()}`;
 
-  // 4. 依條件篩選加油/儲值明細
+  // 4. 依選擇的「實體油卡」與「月份」篩選加油/儲值明細
   let filteredTx = state.fuelTransactions.filter(tx => {
-    if (selectedCarId !== 'ALL' && tx.carId !== selectedCarId) return false;
+    if (selectedCardId !== 'ALL') {
+      const matchId = tx.cardId && tx.cardId === selectedCardId;
+      const matchNo = selectedCard && tx.cardNo && tx.cardNo === selectedCard.cardNo;
+      if (!matchId && !matchNo) return false;
+    }
     if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
     return true;
   });
@@ -2607,21 +2613,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // ------------------------------------------------------------------------
 
   // 1. 依照紙本格式匯出「加油紀錄 Excel 表 (.xls)」
-  function exportFuelExcelTable(carIdFilter = '', monthFilter = '') {
-    const selectCarEl = document.getElementById('fuelCarFilterSelect');
+  function exportFuelExcelTable(cardIdFilter = '', monthFilter = '') {
+    const selectCardEl = document.getElementById('fuelCardFilterSelect');
     const monthPickerEl = document.getElementById('fuelMonthPicker');
 
-    const selectedCarId = carIdFilter || (selectCarEl ? selectCarEl.value : 'ALL');
+    const selectedCardId = cardIdFilter || (selectCardEl ? selectCardEl.value : 'ALL');
     const selectedMonth = monthFilter || (monthPickerEl ? monthPickerEl.value : '');
 
-    let selectedVehicle = state.vehicles.find(v => v.id === selectedCarId);
-    if (!selectedVehicle && state.vehicles.length > 0) {
-      selectedVehicle = state.vehicles[0];
+    let boundVehiclePlate = '';
+    if (selectedCard && selectedCard.boundCarId) {
+      const boundV = state.vehicles.find(v => v.id === selectedCard.boundCarId);
+      if (boundV) boundVehiclePlate = ` (車號：${boundV.plate})`;
     }
-
-    const plate = selectedVehicle ? selectedVehicle.plate : (selectedCarId === 'ALL' ? '全部公務車' : '');
-    const maintMileage = selectedVehicle ? (selectedVehicle.maintMileage || 50000) : 50000;
-    const maintMileageStr = maintMileage ? Number(maintMileage).toLocaleString() : '';
+    const cardHeaderStr = selectedCard ? `${selectedCard.cardNo}${boundVehiclePlate}` : (selectedCardId === 'ALL' ? '全部實體油卡' : '未選擇油卡');
 
     let targetYearStr = '';
     let targetMonthStr = '';
@@ -2641,10 +2645,14 @@ document.addEventListener('DOMContentLoaded', () => {
       rocYearStr = `${y - 1911}`;
     }
 
-    // 篩選加油交易（僅包含加油扣款紀錄，排除儲值）
+    // 篩選加油交易（僅包含選擇油卡之加油扣款紀錄，排除儲值）
     let filteredTx = state.fuelTransactions.filter(tx => {
       if (tx.type !== 'EXPENSE') return false; // 只顯示加油扣款，不顯示儲值
-      if (selectedCarId !== 'ALL' && tx.carId !== selectedCarId) return false;
+      if (selectedCardId !== 'ALL') {
+        const matchId = tx.cardId && tx.cardId === selectedCardId;
+        const matchNo = selectedCard && tx.cardNo && tx.cardNo === selectedCard.cardNo;
+        if (!matchId && !matchNo) return false;
+      }
       if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
       return true;
     });
@@ -2721,12 +2729,12 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
   <table class="title-table">
     <tr>
-      <td colspan="6" style="font-size: 18pt; font-weight: bold; text-align: center; padding: 10px;">公務車加油紀錄表</td>
+      <td colspan="6" style="font-size: 18pt; font-weight: bold; text-align: center; padding: 10px;">公務車油卡加油紀錄表</td>
     </tr>
   </table>
   <table class="meta-table">
     <tr>
-      <td colspan="6" style="text-align: left; font-size: 14pt; font-weight: bold; padding: 4px;">車號：${plate}</td>
+      <td colspan="6" style="text-align: left; font-size: 14pt; font-weight: bold; padding: 4px;">油卡卡號：${cardHeaderStr}</td>
     </tr>
   </table>
   <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
