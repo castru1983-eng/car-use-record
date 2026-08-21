@@ -149,6 +149,22 @@ async function answerCallbackQuery(token, callbackQueryId, text = '') {
   });
 }
 
+// 輔助：取得 Telegram 上傳照片實體 URL
+async function getTelegramFileUrl(token, fileId) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && data.result && data.result.file_path) {
+        return `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching Telegram file path:', e);
+  }
+  return null;
+}
+
 // 讀取當前雲端同步 Data (若為 null 則帶入預設資料)
 async function getCloudState(baseUrl) {
   try {
@@ -237,6 +253,58 @@ function buildPassengerText(carPlate, selectedDrivers, selectedPassengers) {
   const driversDisplay = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '無';
   const psgDisplay = selectedPassengers.length > 0 ? selectedPassengers.join(', ') : '無乘客 (可點選多位)';
   return `🚗 車輛：<b>${carPlate}</b>\n👤 駕駛：<b>${driversDisplay}</b>\n已選乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 3/4】請點選同行乘客（支援複選）：</b>\n<i>（可點選多位乘客，勾選完畢請按「➡️ 選好了，下一步」或「🚫 無同行乘客」）</i>`;
+}
+
+// 完成加油交易寫入與儲存
+async function completeFuelTransaction(token, chatId, draft, photos, baseUrl, state) {
+  const cardId = draft.cardId || (state.fuelCards[0] ? state.fuelCards[0].id : 'fc-1');
+  const amount = draft.amount || 1000;
+  const mileage = draft.mileage || 42850;
+  const person = draft.person || '經辦同仁';
+  const note = draft.note || '無備註';
+
+  const fuelCard = state.fuelCards.find(c => c.id === cardId) || state.fuelCards[0];
+  const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
+
+  const balanceAfter = (fuelCard ? (fuelCard.balance || 0) : 0) - amount;
+  if (fuelCard) fuelCard.balance = balanceAfter;
+
+  if (fuelCard && fuelCard.boundCarId && state.vehicles) {
+    const boundV = state.vehicles.find(v => v.id === fuelCard.boundCarId);
+    if (boundV) boundV.fuelCardBalance = balanceAfter;
+  }
+
+  if (vehicle && mileage > (vehicle.mileage || 0)) {
+    vehicle.mileage = mileage;
+  }
+
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  const newTx = {
+    id: 'ft-' + Date.now(),
+    cardId: fuelCard ? fuelCard.id : 'fc-1',
+    cardNo: fuelCard ? fuelCard.cardNo : '油卡',
+    carId: vehicle ? vehicle.id : 'v1',
+    type: 'EXPENSE',
+    amount: amount,
+    mileage: mileage,
+    balanceAfter: balanceAfter,
+    person: person,
+    date: dateStr,
+    note: note,
+    photos: photos || []
+  };
+
+  state.fuelTransactions.unshift(newTx);
+  await saveCloudState(baseUrl, state);
+
+  delete tempDrafts[chatId];
+
+  const photoText = (photos && photos.length > 0) ? `📸 <b>佐證照片：</b> 已成功上傳 ${photos.length} 張照片` : '📸 <b>佐證照片：</b> 未上傳';
+  const replyText = `⛽ <b>加油扣款已成功登錄！</b>\n\n💳 <b>使用油卡：</b> ${fuelCard ? fuelCard.cardNo : '油卡'}\n💰 <b>扣款金額：</b> - NT$ ${amount.toLocaleString()}\n💵 <b>扣款後餘額：</b> NT$ ${balanceAfter.toLocaleString()}\n📏 <b>當前里程：</b> ${mileage.toLocaleString()} km\n👤 <b>經辦同仁：</b> ${person}\n📝 <b>備註：</b> ${note}\n${photoText}\n⏱️ <b>時間：</b> ${dateStr}`;
+
+  return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
 }
 
 // 處理 Telegram 訊息邏輯
@@ -448,16 +516,17 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
     }
 
-    // D. 互動式加油扣款流程
+    // D. 互動式加油扣款流程 (Steps 1 ~ 6)
+    // 步驟 1/6: 選擇實體油卡
     if (data === 'cmd_fuel') {
-      let text = '⛽ <b>【步驟 1/3】請點選您要使用的實體油卡：</b>';
+      let text = '⛽ <b>【步驟 1/6】請點選您要使用的實體油卡：</b>';
       const buttons = state.fuelCards.map(c => ([{ text: `💳 ${c.cardNo} (餘額 NT$ ${(c.balance || 0).toLocaleString()})`, callback_data: `fl_card_${c.id}` }]));
       buttons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
 
       return sendMessage(token, chatId, text, { inline_keyboard: buttons });
     }
 
-    // 加油選油卡 -> 選擇/輸入加油金額
+    // 步驟 2/6: 選擇/輸入加油金額
     if (data.startsWith('fl_card_')) {
       const cardId = data.replace('fl_card_', '');
       const card = state.fuelCards.find(c => c.id === cardId);
@@ -470,14 +539,14 @@ async function processTelegramUpdate(update, token, baseUrl) {
         step: 'awaiting_fuel_amount'
       };
 
-      let text = `💳 選擇油卡：<b>${tempDrafts[chatId].cardNo}</b> (當前餘額: NT$ ${tempDrafts[chatId].balance.toLocaleString()})\n\n<b>【步驟 2/3】請直接在對話框輸入加油金額：</b>\n<i>（例如：直接輸入 1500 或 1230 傳送）</i>\n\n<i>或可點選熱門金額：</i>`;
+      let text = `💳 選擇油卡：<b>${tempDrafts[chatId].cardNo}</b> (當前餘額: NT$ ${tempDrafts[chatId].balance.toLocaleString()})\n\n<b>【步驟 2/6】請直接在對話框輸入加油金額：</b>\n<i>（例如：直接輸入 1500 或 1230 傳送）</i>\n\n<i>或可點選熱門金額：</i>`;
       const amtButtons = [
         [
           { text: '⛽ $500', callback_data: 'fl_amt_500' },
           { text: '⛽ $1,000', callback_data: 'fl_amt_1000' }
         ],
         [
-          { text: '⛽ $1,500', callback_data: 'fl_amt_1500' },
+          { text: '⛽ $1,500', callback_data: 'fl_amt_2000' },
           { text: '⛽ $2,000', callback_data: 'fl_amt_2000' }
         ],
         [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
@@ -486,13 +555,34 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: amtButtons });
     }
 
-    // 加油選金額 -> 選擇同仁
+    // 步驟 3/6: 加油選金額 -> 選擇/輸入當前里程
     if (data.startsWith('fl_amt_')) {
       const amt = parseInt(data.replace('fl_amt_', '')) || 1000;
       if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
       tempDrafts[chatId].amount = amt;
+      tempDrafts[chatId].step = 'awaiting_fuel_mileage';
 
-      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amt.toLocaleString()}</b>\n\n<b>【步驟 3/3】請點選加油經辦同仁：</b>`;
+      const fuelCard = state.fuelCards.find(c => c.id === tempDrafts[chatId].cardId);
+      const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
+      const boundMileage = vehicle ? (vehicle.mileage || 42850) : 42850;
+
+      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amt.toLocaleString()}</b>\n\n<b>【步驟 3/6】請點選或輸入當前儀表板里程數 (km)：</b>\n<i>（亦可直接在對話框輸入里程數字傳送，例如：42850）</i>`;
+      const mButtons = [
+        [{ text: `📏 使用預設車輛當前里程 (${boundMileage.toLocaleString()} km)`, callback_data: `fl_mileage_${boundMileage}` }],
+        [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+      ];
+
+      return sendMessage(token, chatId, text, { inline_keyboard: mButtons });
+    }
+
+    // 步驟 4/6: 加油選里程 -> 選擇經辦同仁
+    if (data.startsWith('fl_mileage_')) {
+      const mil = parseInt(data.replace('fl_mileage_', '')) || 42850;
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
+      tempDrafts[chatId].mileage = mil;
+      tempDrafts[chatId].step = 'awaiting_fuel_person';
+
+      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${(tempDrafts[chatId].amount || 0).toLocaleString()}</b>\n📏 里程：<b>${mil.toLocaleString()} km</b>\n\n<b>【步驟 4/6】請點選加油經辦同仁：</b>`;
       const pButtons = [];
       for (let i = 0; i < state.personnel.length; i += 3) {
         const row = state.personnel.slice(i, i + 3).map(p => ({
@@ -506,248 +596,295 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
     }
 
-    // 加油選同仁 -> 完成加油扣款！
+    // 步驟 5/6: 加油選同仁 -> 輸入備註說明
     if (data.startsWith('fl_person_')) {
       const person = data.replace('fl_person_', '');
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
+      tempDrafts[chatId].person = person;
+      tempDrafts[chatId].step = 'awaiting_fuel_note';
+
+      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${(tempDrafts[chatId].amount || 0).toLocaleString()}</b>\n📏 里程：<b>${(tempDrafts[chatId].mileage || 0).toLocaleString()} km</b>\n👤 同仁：<b>${person}</b>\n\n<b>【步驟 5/6】請點選「無備註」或直接在對話框輸入加油備註：</b>\n<i>（例如：直接輸入 西屯路中油站發送）</i>`;
+      const nButtons = [
+        [{ text: '📝 無備註 (進入下一步照片佐證)', callback_data: 'fl_note_無備註' }],
+        [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+      ];
+
+      return sendMessage(token, chatId, text, { inline_keyboard: nButtons });
+    }
+
+    // 步驟 6/6: 選擇備註 -> 拍攝/上傳照片佐證
+    if (data.startsWith('fl_note_')) {
+      const rawNote = data.replace('fl_note_', '');
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
+      tempDrafts[chatId].note = (rawNote === '無備註') ? '無備註' : rawNote;
+      tempDrafts[chatId].step = 'awaiting_fuel_photo';
+
+      const draft = tempDrafts[chatId];
+      let text = `💳 油卡：<b>${draft.cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${(draft.amount || 0).toLocaleString()}</b>\n📏 里程：<b>${(draft.mileage || 0).toLocaleString()} km</b>\n👤 同仁：<b>${draft.person || '同仁'}</b>\n📝 備註：<b>${draft.note}</b>\n\n<b>【步驟 6/6】請直接在對話框拍攝傳送照片佐證 (儀表板或發票)：</b>\n<i>（可直接在此傳送照片，或點選下方按鈕直接完成）</i>`;
+      const pButtons = [
+        [{ text: '✅ 無照片，直接完成加油登錄', callback_data: 'fl_complete_nophoto' }],
+        [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+      ];
+
+      return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
+    }
+
+    // 完成加油登錄 (無照片)
+    if (data === 'fl_complete_nophoto') {
       const draft = tempDrafts[chatId] || {};
-      const cardId = draft.cardId || (state.fuelCards[0] ? state.fuelCards[0].id : 'fc-1');
-      const amount = draft.amount || 1000;
-
-      const fuelCard = state.fuelCards.find(c => c.id === cardId) || state.fuelCards[0];
-      const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
-
-      const balanceAfter = (fuelCard.balance || 0) - amount;
-      fuelCard.balance = balanceAfter;
-
-      if (fuelCard.boundCarId && state.vehicles) {
-        const boundV = state.vehicles.find(v => v.id === fuelCard.boundCarId);
-        if (boundV) boundV.fuelCardBalance = balanceAfter;
-      }
-
-      const now = new Date();
-      const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      const newTx = {
-        id: 'ft-' + Date.now(),
-        cardId: fuelCard.id,
-        cardNo: fuelCard.cardNo,
-        carId: vehicle ? vehicle.id : 'v1',
-        type: 'EXPENSE',
-        amount: amount,
-        mileage: vehicle ? (vehicle.mileage || 42850) : 42850,
-        balanceAfter: balanceAfter,
-        person: person,
-        date: dateStr,
-        note: 'Telegram 1-Click 加油扣款',
-        photos: []
-      };
-
-      state.fuelTransactions.unshift(newTx);
-      await saveCloudState(baseUrl, state);
-
-      delete tempDrafts[chatId];
-
-      const replyText = `⛽ <b>加油扣款已成功登錄！</b>\n\n💳 <b>使用油卡：</b> ${fuelCard.cardNo}\n💰 <b>扣款金額：</b> - NT$ ${amount.toLocaleString()}\n💵 <b>扣款後油卡餘額：</b> NT$ ${balanceAfter.toLocaleString()}\n👤 <b>經辦同仁：</b> ${person}\n⏱️ <b>時間：</b> ${dateStr}`;
-      return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+      return completeFuelTransaction(token, chatId, draft, [], baseUrl, state);
     }
   }
 
-  // 2. 處理文字訊息指令 (Message)
-  if (update.message && update.message.text) {
+  // 2. 處理文字與照片訊息指令 (Message)
+  if (update.message) {
     const chatId = update.message.chat.id;
-    const msgText = update.message.text.trim();
-
-    if (msgText.startsWith('/start') || msgText.startsWith('/help') || msgText === '選單' || msgText === '功能') {
-      delete tempDrafts[chatId];
-      return sendMainMenu(token, chatId, baseUrl);
-    }
 
     const state = await getCloudState(baseUrl);
 
-    // 若正處於 步驟 4/4 等待手動輸入備註狀態，則將使用者發送的訊息視為自訂備註並完成簽到
-    if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_note' && !msgText.startsWith('/')) {
+    // 處理 Telegram 直接拍照/傳送照片訊息 (步驟 6/6 照片佐證)
+    if (update.message.photo && tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_photo') {
+      const photosArr = update.message.photo;
+      const largestPhoto = photosArr[photosArr.length - 1];
+      const fileUrl = await getTelegramFileUrl(token, largestPhoto.file_id);
+
+      const photoList = fileUrl ? [fileUrl] : [];
       const draft = tempDrafts[chatId];
-      const note = msgText;
-      const carId = draft.carId || 'v1';
-      const carPlate = draft.carPlate || 'ALZ-3759';
-      const drivers = draft.drivers && draft.drivers.length > 0 ? draft.drivers : ['同仁'];
-      const passengers = draft.passengers || [];
-      const mileage = draft.mileage || 42850;
-
-      const now = new Date();
-      const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-      const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      const newRecord = {
-        id: 'rec-' + Date.now(),
-        carId: carId,
-        plate: carPlate,
-        date: dateYMD,
-        shift: '早班',
-        driver: drivers,
-        passengers: passengers,
-        purpose: note,
-        destination: '',
-        startMileage: mileage,
-        endMileage: null,
-        startDate: dateStr,
-        returnDate: '',
-        status: 'ACTIVE',
-        note: note,
-        notes: note
-      };
-
-      state.records.unshift(newRecord);
-      await saveCloudState(baseUrl, state);
-
-      delete tempDrafts[chatId];
-
-      const drvStr = drivers.join(', ');
-      const psgStr = passengers.length > 0 ? passengers.join(', ') : '無乘客 (單人出車)';
-      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${drvStr}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
-      return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+      return completeFuelTransaction(token, chatId, draft, photoList, baseUrl, state);
     }
 
-    // 若正處於 步驟 2/3 等待手動輸入加油金額狀態，則解析輸入之金額數字並進入步驟 3/3
-    if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_amount' && !msgText.startsWith('/')) {
-      const amount = parseInt(msgText.replace(/[^0-9]/g, ''));
-      if (!amount || isNaN(amount) || amount <= 0) {
-        return sendMessage(token, chatId, '⚠️ <b>無效的金額數字</b>\n\n請直接輸入數字金額，例如：<code>1500</code> 或 <code>1230</code>');
+    // 處理文字訊息
+    if (update.message.text) {
+      const msgText = update.message.text.trim();
+
+      if (msgText.startsWith('/start') || msgText.startsWith('/help') || msgText === '選單' || msgText === '功能') {
+        delete tempDrafts[chatId];
+        return sendMainMenu(token, chatId, baseUrl);
       }
 
-      tempDrafts[chatId].amount = amount;
-      tempDrafts[chatId].step = 'awaiting_fuel_person';
+      // 若正處於 出車簽到 步驟 4/4 等待手動輸入備註狀態
+      if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_note' && !msgText.startsWith('/')) {
+        const draft = tempDrafts[chatId];
+        const note = msgText;
+        const carId = draft.carId || 'v1';
+        const carPlate = draft.carPlate || 'ALZ-3759';
+        const drivers = draft.drivers && draft.drivers.length > 0 ? draft.drivers : ['同仁'];
+        const passengers = draft.passengers || [];
+        const mileage = draft.mileage || 42850;
 
-      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 加油金額：<b>NT$ ${amount.toLocaleString()}</b>\n\n<b>【步驟 3/3】請點選加油經辦同仁：</b>`;
-      const pButtons = [];
-      for (let i = 0; i < state.personnel.length; i += 3) {
-        const row = state.personnel.slice(i, i + 3).map(p => ({
-          text: `👤 ${p.name}`,
-          callback_data: `fl_person_${p.name}`
-        }));
-        pButtons.push(row);
+        const now = new Date();
+        const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+        const newRecord = {
+          id: 'rec-' + Date.now(),
+          carId: carId,
+          plate: carPlate,
+          date: dateYMD,
+          shift: '早班',
+          driver: drivers,
+          passengers: passengers,
+          purpose: note,
+          destination: '',
+          startMileage: mileage,
+          endMileage: null,
+          startDate: dateStr,
+          returnDate: '',
+          status: 'ACTIVE',
+          note: note,
+          notes: note
+        };
+
+        state.records.unshift(newRecord);
+        await saveCloudState(baseUrl, state);
+
+        delete tempDrafts[chatId];
+
+        const drvStr = drivers.join(', ');
+        const psgStr = passengers.length > 0 ? passengers.join(', ') : '無乘客 (單人出車)';
+        const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${drvStr}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
+        return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
       }
-      pButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
 
-      return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
+      // 若正處於 加油 步驟 2/6 等待手動輸入金額狀態
+      if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_amount' && !msgText.startsWith('/')) {
+        const amount = parseInt(msgText.replace(/[^0-9]/g, ''));
+        if (!amount || isNaN(amount) || amount <= 0) {
+          return sendMessage(token, chatId, '⚠️ <b>無效的金額數字</b>\n\n請直接輸入數字金額，例如：<code>1500</code> 或 <code>1230</code>');
+        }
+
+        tempDrafts[chatId].amount = amount;
+        tempDrafts[chatId].step = 'awaiting_fuel_mileage';
+
+        const fuelCard = state.fuelCards.find(c => c.id === tempDrafts[chatId].cardId);
+        const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
+        const boundMileage = vehicle ? (vehicle.mileage || 42850) : 42850;
+
+        let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amount.toLocaleString()}</b>\n\n<b>【步驟 3/6】請點選或輸入當前儀表板里程數 (km)：</b>\n<i>（例如：直接輸入 42850 傳送）</i>`;
+        const mButtons = [
+          [{ text: `📏 使用預設車輛當前里程 (${boundMileage.toLocaleString()} km)`, callback_data: `fl_mileage_${boundMileage}` }],
+          [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+        ];
+
+        return sendMessage(token, chatId, text, { inline_keyboard: mButtons });
+      }
+
+      // 若正處於 加油 步驟 3/6 等待手動輸入里程狀態
+      if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_mileage' && !msgText.startsWith('/')) {
+        const mil = parseInt(msgText.replace(/[^0-9]/g, ''));
+        if (!mil || isNaN(mil) || mil <= 0) {
+          return sendMessage(token, chatId, '⚠️ <b>無效的里程數字</b>\n\n請直接輸入里程數字，例如：<code>42850</code>');
+        }
+
+        tempDrafts[chatId].mileage = mil;
+        tempDrafts[chatId].step = 'awaiting_fuel_person';
+
+        let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${(tempDrafts[chatId].amount || 0).toLocaleString()}</b>\n📏 里程：<b>${mil.toLocaleString()} km</b>\n\n<b>【步驟 4/6】請點選加油經辦同仁：</b>`;
+        const pButtons = [];
+        for (let i = 0; i < state.personnel.length; i += 3) {
+          const row = state.personnel.slice(i, i + 3).map(p => ({
+            text: `👤 ${p.name}`,
+            callback_data: `fl_person_${p.name}`
+          }));
+          pButtons.push(row);
+        }
+        pButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+
+        return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
+      }
+
+      // 若正處於 加油 步驟 5/6 等待手動輸入備註狀態
+      if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_note' && !msgText.startsWith('/')) {
+        tempDrafts[chatId].note = msgText;
+        tempDrafts[chatId].step = 'awaiting_fuel_photo';
+
+        const draft = tempDrafts[chatId];
+        let text = `💳 油卡：<b>${draft.cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${(draft.amount || 0).toLocaleString()}</b>\n📏 里程：<b>${(draft.mileage || 0).toLocaleString()} km</b>\n👤 同仁：<b>${draft.person || '同仁'}</b>\n📝 備註：<b>${draft.note}</b>\n\n<b>【步驟 6/6】請直接在對話框拍攝傳送照片佐證 (儀表板或發票)：</b>\n<i>（可直接在此傳送照片，或點選下方按鈕直接完成）</i>`;
+        const pButtons = [
+          [{ text: '✅ 無照片，直接完成加油登錄', callback_data: 'fl_complete_nophoto' }],
+          [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+        ];
+
+        return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
+      }
+
+      // 處理出車簽到文字指令：/signin 車號 駕駛 乘客 備註
+      if (msgText.startsWith('/signin') || msgText.startsWith('簽到')) {
+        const parts = msgText.replace('/signin', '').replace('簽到', '').trim().split(/\s+/);
+        if (parts.length < 2) {
+          return sendMessage(token, chatId, '⚠️ <b>簽到格式不完整</b>\n\n請使用格式：\n<code>/signin 車牌 駕駛姓名 乘客姓名 備註</code>\n\n例如：\n<code>/signin ALZ-3759 林大為 陳靜宜 公務外勤</code>');
+        }
+
+        let carQuery = parts[0];
+        let driverStr = parts[1];
+        let passengerStr = parts[2] || '';
+        let note = parts.slice(3).join(' ') || 'Telegram Bot 簽到';
+
+        let vehicle = null;
+        if (state && state.vehicles) {
+          vehicle = state.vehicles.find(v => v.plate.toLowerCase().includes(carQuery.toLowerCase()));
+        }
+        if (!vehicle && state && state.vehicles && state.vehicles.length > 0) {
+          vehicle = state.vehicles[0];
+        }
+
+        const carId = vehicle ? vehicle.id : 'v1';
+        const carPlate = vehicle ? vehicle.plate : carQuery;
+        const mileage = vehicle ? (vehicle.mileage || 42850) : 42850;
+
+        const now = new Date();
+        const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+        const driversArr = driverStr.split(',').map(s => s.trim()).filter(Boolean);
+        const passengersArr = passengerStr ? passengerStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+        const newRecord = {
+          id: 'rec-' + Date.now(),
+          carId: carId,
+          plate: carPlate,
+          date: dateYMD,
+          shift: '早班',
+          driver: driversArr.length > 0 ? driversArr : ['同仁'],
+          passengers: passengersArr,
+          purpose: note || '公務外勤',
+          destination: '',
+          startMileage: mileage,
+          endMileage: null,
+          startDate: dateStr,
+          returnDate: '',
+          status: 'ACTIVE',
+          note: note || 'Telegram Bot 簽到',
+          notes: note || 'Telegram Bot 簽到'
+        };
+
+        state.records.unshift(newRecord);
+        await saveCloudState(baseUrl, state);
+
+        const psgDisplay = passengersArr.length > 0 ? passengersArr.join(', ') : '無乘客 (單人出車)';
+        const replyText = `✅ <b>出車簽到成功！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driversArr.join(', ')}\n👥 <b>同行乘客：</b> ${psgDisplay}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>時間：</b> ${dateStr}`;
+        return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+      }
+
+      // 處理加油扣款文字指令：/fuel 金額 里程 姓名 備註
+      if (msgText.startsWith('/fuel') || msgText.startsWith('加油')) {
+        const parts = msgText.replace('/fuel', '').replace('加油', '').trim().split(/\s+/);
+        if (parts.length < 1 || !parseInt(parts[0])) {
+          return sendMessage(token, chatId, '⚠️ <b>加油格式不完整</b>\n\n請使用格式：\n<code>/fuel 加油金額 當前里程 加油同仁 備註</code>\n\n例如：\n<code>/fuel 1500 42850 林大為 中油西屯站</code>');
+        }
+
+        let amount = parseInt(parts[0]) || 0;
+        let mileage = parseInt(parts[1]) || 0;
+        let person = parts[2] || (update.message.from ? update.message.from.first_name : '駕駛同仁');
+        let note = parts.slice(3).join(' ') || 'Telegram Bot 加油紀錄';
+
+        let fuelCard = (state && state.fuelCards && state.fuelCards.length > 0) ? state.fuelCards[0] : null;
+        let vehicle = (state && state.vehicles && state.vehicles.length > 0) ? state.vehicles[0] : null;
+
+        if (!fuelCard) {
+          return sendMessage(token, chatId, '⚠️ 系統中尚無實體油卡可供扣款，請先在車輛管理新增油卡。');
+        }
+
+        const balanceAfter = (fuelCard.balance || 0) - amount;
+        fuelCard.balance = balanceAfter;
+
+        if (fuelCard.boundCarId && state.vehicles) {
+          const boundV = state.vehicles.find(v => v.id === fuelCard.boundCarId);
+          if (boundV) boundV.fuelCardBalance = balanceAfter;
+        }
+
+        if (vehicle && mileage > (vehicle.mileage || 0)) {
+          vehicle.mileage = mileage;
+        }
+
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+        const newTx = {
+          id: 'ft-' + Date.now(),
+          cardId: fuelCard.id,
+          cardNo: fuelCard.cardNo,
+          carId: vehicle ? vehicle.id : 'v1',
+          type: 'EXPENSE',
+          amount: amount,
+          mileage: mileage,
+          balanceAfter: balanceAfter,
+          person: person,
+          date: dateStr,
+          note: note,
+          photos: []
+        };
+
+        state.fuelTransactions.unshift(newTx);
+        await saveCloudState(baseUrl, state);
+
+        const replyText = `⛽ <b>加油扣款已成功登錄！</b>\n\n💳 <b>使用油卡：</b> ${fuelCard.cardNo}\n💰 <b>扣款金額：</b> - NT$ ${amount.toLocaleString()}\n💵 <b>扣款後油卡餘額：</b> NT$ ${balanceAfter.toLocaleString()}\n📏 <b>當前里程：</b> ${mileage ? mileage.toLocaleString() + ' km' : '-'}\n👤 <b>經辦同仁：</b> ${person}\n⏱️ <b>時間：</b> ${dateStr}`;
+        return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+      }
+
+      // 未知指令預設回覆主選單
+      return sendMainMenu(token, chatId, baseUrl);
     }
-
-    // 處理出車簽到文字指令：/signin 車號 駕駛 乘客 備註
-    if (msgText.startsWith('/signin') || msgText.startsWith('簽到')) {
-      const parts = msgText.replace('/signin', '').replace('簽到', '').trim().split(/\s+/);
-      if (parts.length < 2) {
-        return sendMessage(token, chatId, '⚠️ <b>簽到格式不完整</b>\n\n請使用格式：\n<code>/signin 車牌 駕駛姓名 乘客姓名 備註</code>\n\n例如：\n<code>/signin ALZ-3759 林大為 陳靜宜 公務外勤</code>');
-      }
-
-      let carQuery = parts[0];
-      let driverStr = parts[1];
-      let passengerStr = parts[2] || '';
-      let note = parts.slice(3).join(' ') || 'Telegram Bot 簽到';
-
-      let vehicle = null;
-      if (state && state.vehicles) {
-        vehicle = state.vehicles.find(v => v.plate.toLowerCase().includes(carQuery.toLowerCase()));
-      }
-      if (!vehicle && state && state.vehicles && state.vehicles.length > 0) {
-        vehicle = state.vehicles[0];
-      }
-
-      const carId = vehicle ? vehicle.id : 'v1';
-      const carPlate = vehicle ? vehicle.plate : carQuery;
-      const mileage = vehicle ? (vehicle.mileage || 42850) : 42850;
-
-      const now = new Date();
-      const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-      const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      const driversArr = driverStr.split(',').map(s => s.trim()).filter(Boolean);
-      const passengersArr = passengerStr ? passengerStr.split(',').map(s => s.trim()).filter(Boolean) : [];
-
-      const newRecord = {
-        id: 'rec-' + Date.now(),
-        carId: carId,
-        plate: carPlate,
-        date: dateYMD,
-        shift: '早班',
-        driver: driversArr.length > 0 ? driversArr : ['同仁'],
-        passengers: passengersArr,
-        purpose: note || '公務外勤',
-        destination: '',
-        startMileage: mileage,
-        endMileage: null,
-        startDate: dateStr,
-        returnDate: '',
-        status: 'ACTIVE',
-        note: note || 'Telegram Bot 簽到',
-        notes: note || 'Telegram Bot 簽到'
-      };
-
-      state.records.unshift(newRecord);
-      await saveCloudState(baseUrl, state);
-
-      const psgDisplay = passengersArr.length > 0 ? passengersArr.join(', ') : '無乘客 (單人出車)';
-      const replyText = `✅ <b>出車簽到成功！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driversArr.join(', ')}\n👥 <b>同行乘客：</b> ${psgDisplay}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>時間：</b> ${dateStr}`;
-      return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
-    }
-
-    // 處理加油扣款文字指令：/fuel 金額 里程 姓名 備註
-    if (msgText.startsWith('/fuel') || msgText.startsWith('加油')) {
-      const parts = msgText.replace('/fuel', '').replace('加油', '').trim().split(/\s+/);
-      if (parts.length < 1 || !parseInt(parts[0])) {
-        return sendMessage(token, chatId, '⚠️ <b>加油格式不完整</b>\n\n請使用格式：\n<code>/fuel 加油金額 當前里程 加油同仁 備註</code>\n\n例如：\n<code>/fuel 1500 42850 林大為 中油西屯站</code>');
-      }
-
-      let amount = parseInt(parts[0]) || 0;
-      let mileage = parseInt(parts[1]) || 0;
-      let person = parts[2] || (update.message.from ? update.message.from.first_name : '駕駛同仁');
-      let note = parts.slice(3).join(' ') || 'Telegram Bot 加油紀錄';
-
-      let fuelCard = (state && state.fuelCards && state.fuelCards.length > 0) ? state.fuelCards[0] : null;
-      let vehicle = (state && state.vehicles && state.vehicles.length > 0) ? state.vehicles[0] : null;
-
-      if (!fuelCard) {
-        return sendMessage(token, chatId, '⚠️ 系統中尚無實體油卡可供扣款，請先在車輛管理新增油卡。');
-      }
-
-      const balanceAfter = (fuelCard.balance || 0) - amount;
-      fuelCard.balance = balanceAfter;
-
-      if (fuelCard.boundCarId && state.vehicles) {
-        const boundV = state.vehicles.find(v => v.id === fuelCard.boundCarId);
-        if (boundV) boundV.fuelCardBalance = balanceAfter;
-      }
-
-      if (vehicle && mileage > (vehicle.mileage || 0)) {
-        vehicle.mileage = mileage;
-      }
-
-      const now = new Date();
-      const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      const newTx = {
-        id: 'ft-' + Date.now(),
-        cardId: fuelCard.id,
-        cardNo: fuelCard.cardNo,
-        carId: vehicle ? vehicle.id : 'v1',
-        type: 'EXPENSE',
-        amount: amount,
-        mileage: mileage,
-        balanceAfter: balanceAfter,
-        person: person,
-        date: dateStr,
-        note: note,
-        photos: []
-      };
-
-      state.fuelTransactions.unshift(newTx);
-      await saveCloudState(baseUrl, state);
-
-      const replyText = `⛽ <b>加油扣款已成功登錄！</b>\n\n💳 <b>使用油卡：</b> ${fuelCard.cardNo}\n💰 <b>加油金額：</b> - NT$ ${amount.toLocaleString()}\n💵 <b>扣款後油卡餘額：</b> NT$ ${balanceAfter.toLocaleString()}\n📏 <b>當前里程：</b> ${mileage ? mileage.toLocaleString() + ' km' : '-'}\n👤 <b>經辦同仁：</b> ${person}\n⏱️ <b>時間：</b> ${dateStr}`;
-      return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
-    }
-
-    // 未知指令預設回覆主選單
-    return sendMainMenu(token, chatId, baseUrl);
   }
 }
 
