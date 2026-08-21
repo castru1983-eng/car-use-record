@@ -638,6 +638,48 @@ function renderVehicles() {
   });
 }
 
+// (D.15) 渲染實體油卡清單卡片 (#fuelCardsGrid)
+function renderFuelCards() {
+  const grid = document.getElementById('fuelCardsGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  if (!state.fuelCards || state.fuelCards.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 1rem;">
+        目前尚無登記的實體油卡，請點擊【新增實體油卡】建置油卡資料
+      </div>
+    `;
+    return;
+  }
+
+  state.fuelCards.forEach(c => {
+    const boundVehicle = state.vehicles.find(v => v.id === c.boundCarId);
+    const boundText = boundVehicle ? `${boundVehicle.plate} (${boundVehicle.model})` : '無綁定 (通用油卡)';
+
+    const cardEl = document.createElement('div');
+    cardEl.style.cssText = 'background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.6rem;';
+    cardEl.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+        <div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: #065f46;"><i class="fa-solid fa-credit-card" style="color: #059669;"></i> ${c.cardNo}</div>
+          <div style="font-size: 0.78rem; color: #047857; margin-top: 0.2rem;">綁定：${boundText}</div>
+          ${c.note ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">備註：${c.note}</div>` : ''}
+        </div>
+        <div style="font-size: 1.15rem; font-weight: 800; color: #059669; white-space: nowrap;">NT$ ${(c.balance || 0).toLocaleString()}</div>
+      </div>
+
+      <div style="display: flex; gap: 0.4rem; justify-content: flex-end; align-items: center; border-top: 1px dashed #bbf7d0; padding-top: 0.5rem;">
+        <button class="btn btn-secondary btn-quick-topup-card" data-id="${c.id}" style="padding: 0.25rem 0.6rem; font-size: 0.76rem; background: #d1fae5; color: #047857; border: none; font-weight:700;"><i class="fa-solid fa-plus"></i> 儲值</button>
+        <button class="btn btn-secondary btn-quick-expense-card" data-id="${c.id}" style="padding: 0.25rem 0.6rem; font-size: 0.76rem; background: #fee2e2; color: #b91c1c; border: none; font-weight:700;"><i class="fa-solid fa-gas-pump"></i> 加油扣款</button>
+        <button class="btn btn-icon btn-edit-fuel-card" data-id="${c.id}" title="編輯油卡"><i class="fa-solid fa-pen" style="font-size: 0.8rem;"></i></button>
+        <button class="btn btn-icon btn-delete-fuel-card" data-id="${c.id}" title="刪除油卡"><i class="fa-solid fa-trash" style="color: var(--danger-color); font-size: 0.8rem;"></i></button>
+      </div>
+    `;
+    grid.appendChild(cardEl);
+  });
+}
+
 // (D.2) 渲染油卡餘額與交易明細管理 (Fuel Card Management)
 function renderFuelCardManagement() {
   const tbody = document.getElementById('fuelTransactionTbody');
@@ -1980,46 +2022,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ------------------------------------------------------------------------
   // F.3 實體油卡管理 Modal 與點擊事件處理
   // ------------------------------------------------------------------------
-  function renderFuelCards() {
-    const grid = document.getElementById('fuelCardsGrid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    if (state.fuelCards.length === 0) {
-      grid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 1rem;">
-          目前尚無登記的實體油卡，請點擊【新增實體油卡】建置油卡資料
-        </div>
-      `;
-      return;
-    }
-
-    state.fuelCards.forEach(c => {
-      const boundVehicle = state.vehicles.find(v => v.id === c.boundCarId);
-      const boundText = boundVehicle ? `${boundVehicle.plate} (${boundVehicle.model})` : '無綁定 (通用油卡)';
-
-      const cardEl = document.createElement('div');
-      cardEl.style.cssText = 'background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.6rem;';
-      cardEl.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
-          <div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: #065f46;"><i class="fa-solid fa-credit-card" style="color: #059669;"></i> ${c.cardNo}</div>
-            <div style="font-size: 0.78rem; color: #047857; margin-top: 0.2rem;">綁定：${boundText}</div>
-            ${c.note ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">備註：${c.note}</div>` : ''}
-          </div>
-          <div style="font-size: 1.15rem; font-weight: 800; color: #059669; white-space: nowrap;">NT$ ${c.balance.toLocaleString()}</div>
-        </div>
-
-        <div style="display: flex; gap: 0.4rem; justify-content: flex-end; align-items: center; border-top: 1px dashed #bbf7d0; padding-top: 0.5rem;">
-          <button class="btn btn-secondary btn-quick-topup-card" data-id="${c.id}" style="padding: 0.25rem 0.6rem; font-size: 0.76rem; background: #d1fae5; color: #047857; border: none; font-weight:700;"><i class="fa-solid fa-plus"></i> 儲值</button>
-          <button class="btn btn-secondary btn-quick-expense-card" data-id="${c.id}" style="padding: 0.25rem 0.6rem; font-size: 0.76rem; background: #fee2e2; color: #b91c1c; border: none; font-weight:700;"><i class="fa-solid fa-gas-pump"></i> 加油扣款</button>
-          <button class="btn btn-icon btn-edit-fuel-card" data-id="${c.id}" title="編輯油卡"><i class="fa-solid fa-pen" style="font-size: 0.8rem;"></i></button>
-          <button class="btn btn-icon btn-delete-fuel-card" data-id="${c.id}" title="刪除油卡"><i class="fa-solid fa-trash" style="color: var(--danger-color); font-size: 0.8rem;"></i></button>
-        </div>
-      `;
-      grid.appendChild(cardEl);
-    });
-  }
 
   const modalFuelCard = document.getElementById('modalFuelCard');
   const formFuelCard = document.getElementById('formFuelCard');
