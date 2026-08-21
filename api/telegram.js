@@ -555,20 +555,15 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: amtButtons });
     }
 
-    // 步驟 3/6: 加油選金額 -> 選擇/輸入當前里程
+    // 步驟 3/6: 加油選金額 -> 輸入當前儀表板里程
     if (data.startsWith('fl_amt_')) {
       const amt = parseInt(data.replace('fl_amt_', '')) || 1000;
       if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
       tempDrafts[chatId].amount = amt;
       tempDrafts[chatId].step = 'awaiting_fuel_mileage';
 
-      const fuelCard = state.fuelCards.find(c => c.id === tempDrafts[chatId].cardId);
-      const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
-      const boundMileage = vehicle ? (vehicle.mileage || 42850) : 42850;
-
-      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amt.toLocaleString()}</b>\n\n<b>【步驟 3/6】請點選或輸入當前儀表板里程數 (km)：</b>\n<i>（亦可直接在對話框輸入里程數字傳送，例如：42850）</i>`;
+      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amt.toLocaleString()}</b>\n\n<b>【步驟 3/6】請直接在對話框輸入當前儀表板里程數 (km)：</b>\n<i>（例如：直接輸入 42850 傳送）</i>`;
       const mButtons = [
-        [{ text: `📏 使用預設車輛當前里程 (${boundMileage.toLocaleString()} km)`, callback_data: `fl_mileage_${boundMileage}` }],
         [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
       ];
 
@@ -716,13 +711,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
         tempDrafts[chatId].amount = amount;
         tempDrafts[chatId].step = 'awaiting_fuel_mileage';
 
-        const fuelCard = state.fuelCards.find(c => c.id === tempDrafts[chatId].cardId);
-        const vehicle = state.vehicles.find(v => v.id === (fuelCard ? fuelCard.boundCarId : '')) || state.vehicles[0];
-        const boundMileage = vehicle ? (vehicle.mileage || 42850) : 42850;
-
-        let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amount.toLocaleString()}</b>\n\n<b>【步驟 3/6】請點選或輸入當前儀表板里程數 (km)：</b>\n<i>（例如：直接輸入 42850 傳送）</i>`;
+        let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 金額：<b>NT$ ${amount.toLocaleString()}</b>\n\n<b>【步驟 3/6】請直接在對話框輸入當前儀表板里程數 (km)：</b>\n<i>（例如：直接輸入 42850 傳送）</i>`;
         const mButtons = [
-          [{ text: `📏 使用預設車輛當前里程 (${boundMileage.toLocaleString()} km)`, callback_data: `fl_mileage_${boundMileage}` }],
           [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
         ];
 
