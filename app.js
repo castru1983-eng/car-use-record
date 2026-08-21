@@ -2672,12 +2672,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedCardId = cardIdFilter || (selectCardEl ? selectCardEl.value : 'ALL');
     const selectedMonth = monthFilter || (monthPickerEl ? monthPickerEl.value : '');
 
+    const selectedCard = state.fuelCards ? state.fuelCards.find(c => c.id === selectedCardId) : null;
+
     let boundVehiclePlate = '';
     if (selectedCard && selectedCard.boundCarId) {
       const boundV = state.vehicles.find(v => v.id === selectedCard.boundCarId);
       if (boundV) boundVehiclePlate = ` (車號：${boundV.plate})`;
     }
     const cardHeaderStr = selectedCard ? `${selectedCard.cardNo}${boundVehiclePlate}` : (selectedCardId === 'ALL' ? '全部實體油卡' : '未選擇油卡');
+    const plate = selectedCard ? selectedCard.cardNo : '全部油卡';
 
     let targetYearStr = '';
     let targetMonthStr = '';
@@ -2828,21 +2831,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let csvContent = "\uFEFF單號,用車日期,車牌號碼,駕駛人,部門,目的地,事由,時段,出發里程(km),歸還里程(km),累積行駛(km),狀態,油電狀態,同行人員\n";
 
     state.records.forEach(r => {
+      const driverStr = Array.isArray(r.driver) ? r.driver.join('/') : (r.driver || '');
+      const psgStr = Array.isArray(r.passengers) ? r.passengers.join('/') : (r.passengers || '');
+      const destStr = r.destination ? r.destination.replace(/"/g, '""') : '';
+      const purposeStr = (r.purpose || r.note || '').replace(/"/g, '""');
+
       const row = [
-        `"${r.id}"`,
-        `"${r.date}"`,
-        `"${r.plate}"`,
-        `"${r.driver}"`,
-        `"${r.department}"`,
-        `"${r.destination.replace(/"/g, '""')}"`,
-        `"${(r.purpose || '').replace(/"/g, '""')}"`,
+        `"${r.id || ''}"`,
+        `"${r.date || ''}"`,
+        `"${r.plate || ''}"`,
+        `"${driverStr}"`,
+        `"${r.department || ''}"`,
+        `"${destStr}"`,
+        `"${purposeStr}"`,
         `"${r.startTime || ''}-${r.endTime || ''}"`,
         `"${r.startMileage || 0}"`,
         `"${r.endMileage || ''}"`,
         `"${r.totalKm || 0}"`,
         `"${r.status === 'COMPLETED' ? '已還車簽退' : (r.status === 'ACTIVE' ? '使用出勤中' : '預約中')}"`,
         `"${r.fuelStatus || ''}"`,
-        `"${(r.passengers || '').replace(/"/g, '""')}"`
+        `"${psgStr}"`
       ].join(",");
       csvContent += row + "\n";
     });
