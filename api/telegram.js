@@ -889,10 +889,6 @@ function sendMainMenu(token, chatId, baseUrl) {
         { text: '⛽ 新增加油扣款', callback_data: 'cmd_fuel' }
       ],
       [
-        { text: '💳 查詢油卡餘額', callback_data: 'cmd_cards' },
-        { text: '📋 當前出勤車輛', callback_data: 'cmd_status' }
-      ],
-      [
         { text: '📱 開啟 WebApp 網頁版介面', web_app: { url: baseUrl } }
       ]
     ]
