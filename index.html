@@ -26,17 +26,25 @@
 
   <!-- 頂部導覽列 Navbar -->
   <nav class="navbar">
-    <a href="#" class="navbar-brand">
-      <i class="fa-solid fa-car-side"></i>
-      <span>公務車簽到紀錄系統</span>
-    </a>
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 0.2rem; flex-wrap: wrap; gap: 0.5rem;">
+      <a href="#" class="navbar-brand">
+        <i class="fa-solid fa-car-side"></i>
+        <span>公務車簽到紀錄系統</span>
+      </a>
+
+      <!-- 手機精簡模式 / 電腦完整模式切換按鈕 -->
+      <button class="nav-mode-btn" id="btnToggleMobileMode" title="切換 手機精簡模式 / 電腦完整模式">
+        <i class="fa-solid fa-mobile-screen"></i> <span id="mobileModeBtnText">📱 切換手機模式</span>
+      </button>
+    </div>
+
     <ul class="navbar-nav">
       <li>
         <button class="nav-btn active" id="tabCalendar" data-target="calendarView">
           <i class="fa-regular fa-calendar-days"></i> 月曆簽到視圖
         </button>
       </li>
-      <li>
+      <li class="nav-item-desktop-only">
         <button class="nav-btn" id="tabTable" data-target="tableView">
           <i class="fa-solid fa-list-check"></i> 使用紀錄清單
         </button>
@@ -46,12 +54,12 @@
           <i class="fa-solid fa-gas-pump"></i> 油卡與加油紀錄
         </button>
       </li>
-      <li>
+      <li class="nav-item-desktop-only">
         <button class="nav-btn" id="tabMaintenance" data-target="maintenanceView">
           <i class="fa-solid fa-wrench"></i> 車輛保養與狀況紀錄
         </button>
       </li>
-      <li>
+      <li class="nav-item-desktop-only">
         <button class="nav-btn" id="tabVehicle" data-target="vehicleView">
           <i class="fa-solid fa-car-rear"></i> 車輛資料管理
         </button>

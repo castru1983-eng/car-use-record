@@ -121,6 +121,38 @@ body {
   background: var(--primary-color);
 }
 
+/* 手機精簡模式 Mobile Mode Styles */
+body.mobile-mode .nav-item-desktop-only {
+  display: none !important;
+}
+
+.nav-mode-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #38bdf8;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.nav-mode-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  color: #ffffff;
+}
+
+body.mobile-mode .nav-mode-btn {
+  background: #059669;
+  border-color: #34d399;
+  color: #ffffff;
+}
+
 /* 主內容區域 Layout */
 .app-container {
   max-width: 1440px;

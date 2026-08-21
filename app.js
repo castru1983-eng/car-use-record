@@ -1135,6 +1135,42 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ------------------------------------------------------------------------
+  // A.1 手機精簡模式 (Mobile Mode) 切換控制
+  // ------------------------------------------------------------------------
+  const btnToggleMobileMode = document.getElementById('btnToggleMobileMode');
+  const mobileModeBtnText = document.getElementById('mobileModeBtnText');
+
+  const setMobileMode = (isMobile) => {
+    if (isMobile) {
+      document.body.classList.add('mobile-mode');
+      if (mobileModeBtnText) mobileModeBtnText.innerText = '📱 手機模式 (簡化版)';
+      if (state.activeView !== 'calendarView' && state.activeView !== 'fuelView') {
+        switchView('calendarView');
+      }
+    } else {
+      document.body.classList.remove('mobile-mode');
+      if (mobileModeBtnText) mobileModeBtnText.innerText = '💻 切換手機模式';
+    }
+    localStorage.setItem('user_mobile_mode_pref', isMobile ? 'true' : 'false');
+  };
+
+  const savedMobilePref = localStorage.getItem('user_mobile_mode_pref');
+  if (savedMobilePref === 'true') {
+    setMobileMode(true);
+  } else if (savedMobilePref === 'false') {
+    setMobileMode(false);
+  } else {
+    setMobileMode(window.innerWidth <= 768);
+  }
+
+  if (btnToggleMobileMode) {
+    btnToggleMobileMode.addEventListener('click', () => {
+      const isMobileNow = document.body.classList.contains('mobile-mode');
+      setMobileMode(!isMobileNow);
+    });
+  }
+
+  // ------------------------------------------------------------------------
   // B. 月曆控制列 (Prev/Next Month, Today, Vehicle Filter)
   // ------------------------------------------------------------------------
   document.getElementById('btnPrevMonth').addEventListener('click', () => {
