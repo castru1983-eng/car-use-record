@@ -2920,5 +2920,84 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnPrintCalendar').addEventListener('click', () => {
     window.print();
   });
+
+  // ------------------------------------------------------------------------
+  // H. Telegram Bot 機器人整合設定
+  // ------------------------------------------------------------------------
+  const modalTelegram = document.getElementById('modalTelegram');
+  const btnOpenTelegramModal = document.getElementById('btnOpenTelegramModal');
+  const btnCloseTelegramModal = document.getElementById('btnCloseTelegramModal');
+  const btnCancelTelegram = document.getElementById('btnCancelTelegram');
+  const btnSetTgWebhook = document.getElementById('btnSetTgWebhook');
+  const tgBotTokenInput = document.getElementById('tgBotTokenInput');
+  const tgWebhookStatusResult = document.getElementById('tgWebhookStatusResult');
+
+  if (btnOpenTelegramModal && modalTelegram) {
+    btnOpenTelegramModal.addEventListener('click', () => {
+      modalTelegram.classList.add('active');
+    });
+  }
+
+  if (btnCloseTelegramModal && modalTelegram) btnCloseTelegramModal.addEventListener('click', () => modalTelegram.classList.remove('active'));
+  if (btnCancelTelegram && modalTelegram) btnCancelTelegram.addEventListener('click', () => modalTelegram.classList.remove('active'));
+
+  if (btnSetTgWebhook && tgBotTokenInput) {
+    btnSetTgWebhook.addEventListener('click', async () => {
+      const token = tgBotTokenInput.value.trim();
+      if (!token) {
+        alert('請輸入有效的 Telegram Bot Token');
+        return;
+      }
+
+      btnSetTgWebhook.disabled = true;
+      btnSetTgWebhook.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在綁定 Webhook...';
+
+      try {
+        const webhookApiUrl = `/api/telegram?action=set_webhook&token=${encodeURIComponent(token)}`;
+        const res = await fetch(webhookApiUrl);
+        const data = await res.json();
+
+        if (tgWebhookStatusResult) {
+          tgWebhookStatusResult.style.display = 'block';
+          if (data.success && data.tgResponse && data.tgResponse.ok) {
+            tgWebhookStatusResult.style.background = '#f0fdf4';
+            tgWebhookStatusResult.style.borderColor = '#bbf7d0';
+            tgWebhookStatusResult.style.color = '#166534';
+            tgWebhookStatusResult.innerHTML = `<strong>✅ 成功綁定 Telegram Webhook！</strong><br>Webhook URL: <code>${data.webhookUrl}</code><br>現在您可以在 Telegram 搜尋您的機器人發送 <code>/start</code> 開始使用！`;
+          } else {
+            tgWebhookStatusResult.style.background = '#fef2f2';
+            tgWebhookStatusResult.style.borderColor = '#fecaca';
+            tgWebhookStatusResult.style.color = '#991b1b';
+            tgWebhookStatusResult.innerHTML = `<strong>❌ 綁定失敗：</strong> ${JSON.stringify(data.tgResponse || data)}`;
+          }
+        }
+      } catch (err) {
+        if (tgWebhookStatusResult) {
+          tgWebhookStatusResult.style.display = 'block';
+          tgWebhookStatusResult.style.background = '#fef2f2';
+          tgWebhookStatusResult.style.borderColor = '#fecaca';
+          tgWebhookStatusResult.style.color = '#991b1b';
+          tgWebhookStatusResult.innerHTML = `<strong>❌ 請求發生錯誤：</strong> ${err.message}`;
+        }
+      } finally {
+        btnSetTgWebhook.disabled = false;
+        btnSetTgWebhook.innerHTML = '<i class="fa-solid fa-link"></i> 一鍵綁定 Telegram Webhook';
+      }
+    });
+  }
+
+  // Telegram WebApp 自動偵測與使用者初始化
+  if (window.Telegram && window.Telegram.WebApp) {
+    try {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (tgUser && tgUser.first_name) {
+        console.log('Telegram WebApp user detected:', tgUser.first_name);
+      }
+    } catch (e) {
+      console.warn('Telegram WebApp init warning:', e);
+    }
+  }
 });
 
