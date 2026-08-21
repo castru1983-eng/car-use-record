@@ -1155,7 +1155,7 @@ body.mobile-mode .nav-mode-btn {
     text-align: center;
   }
 
-  /* 手機端日曆容器滑動防護 */
+  /* 手機端日曆容器與適配 */
   .calendar-container {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
@@ -1164,11 +1164,21 @@ body.mobile-mode .nav-mode-btn {
 
   .calendar-header-grid,
   .calendar-days-grid {
-    min-width: 720px !important; /* 確保 7 個星期欄位完整展開不擠壓，可在手機上順暢左右滑動 */
+    min-width: 100% !important;
   }
 
   .calendar-days-grid {
-    grid-auto-rows: minmax(100px, 1fr);
+    grid-auto-rows: minmax(85px, 1fr);
+  }
+
+  .calendar-cell {
+    padding: 0.35rem 0.25rem;
+  }
+
+  .record-tag {
+    padding: 0.25rem 0.3rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.72rem;
   }
 
   /* 手機專用右下角懸浮簽到按鈕 */
