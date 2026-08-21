@@ -636,6 +636,9 @@ function renderVehicles() {
     `;
     container.appendChild(card);
   });
+
+  // 渲染實體油卡清單卡片 (#fuelCardsGrid)
+  renderFuelCards();
 }
 
 // (D.15) 渲染實體油卡清單卡片 (#fuelCardsGrid)
