@@ -2674,13 +2674,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const selectedCard = state.fuelCards ? state.fuelCards.find(c => c.id === selectedCardId) : null;
 
-    let boundVehiclePlate = '';
-    if (selectedCard && selectedCard.boundCarId) {
-      const boundV = state.vehicles.find(v => v.id === selectedCard.boundCarId);
-      if (boundV) boundVehiclePlate = ` (車號：${boundV.plate})`;
+    let boundCarPlateStr = '';
+    let cardNoStr = '全部實體油卡';
+
+    if (selectedCard) {
+      cardNoStr = selectedCard.cardNo || '未知油卡';
+      const boundV = state.vehicles.find(v => v.id === selectedCard.boundCarId || v.fuelCardId === selectedCard.id);
+      if (boundV) {
+        boundCarPlateStr = `${boundV.plate} (${boundV.model || '公務車'})`;
+      } else {
+        boundCarPlateStr = '全部公務車';
+      }
+    } else if (selectedCardId === 'ALL') {
+      cardNoStr = '全部實體油卡';
+      boundCarPlateStr = '全部車隊公務車';
+    } else {
+      cardNoStr = selectedCardId;
+      boundCarPlateStr = '公務車';
     }
-    const cardHeaderStr = selectedCard ? `${selectedCard.cardNo}${boundVehiclePlate}` : (selectedCardId === 'ALL' ? '全部實體油卡' : '未選擇油卡');
-    const plate = selectedCard ? selectedCard.cardNo : '全部油卡';
+
+    const cardHeaderStr = `車牌號碼：${boundCarPlateStr}　｜　油卡卡號：${cardNoStr}`;
+    const plate = selectedCard ? (boundCarPlateStr.split(' ')[0] + '_' + selectedCard.cardNo) : '全部油卡';
 
     let targetYearStr = '';
     let targetMonthStr = '';
@@ -2789,7 +2803,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </table>
   <table class="meta-table">
     <tr>
-      <td colspan="6" style="text-align: left; font-size: 14pt; font-weight: bold; padding: 4px;">油卡卡號：${cardHeaderStr}</td>
+      <td colspan="6" style="text-align: left; font-size: 13pt; font-weight: bold; padding: 4px;">${cardHeaderStr}</td>
     </tr>
   </table>
   <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
