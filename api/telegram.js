@@ -264,23 +264,19 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: psgButtons });
     }
 
-    // 步驟 4/4: 選擇備註說明
+    // 步驟 4/4: 選擇/輸入備註說明
     if (data.startsWith('sn_psg_')) {
       const psg = data.replace('sn_psg_', '');
       if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
       tempDrafts[chatId].passenger = (psg === 'none') ? '' : psg;
+      tempDrafts[chatId].step = 'awaiting_note';
 
       const psgDisplay = tempDrafts[chatId].passenger ? tempDrafts[chatId].passenger : '無乘客';
-      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${tempDrafts[chatId].driver || '同仁'}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/4】請點選出勤備註：</b>`;
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${tempDrafts[chatId].driver || '同仁'}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
       
       const noteButtons = [
         [
-          { text: '📝 無備註', callback_data: 'sn_note_無備註' },
-          { text: '📝 公務外勤', callback_data: 'sn_note_公務外勤' }
-        ],
-        [
-          { text: '📝 客戶拜訪', callback_data: 'sn_note_客戶拜訪' },
-          { text: '📝 廠區巡視/維護', callback_data: 'sn_note_廠區巡視' }
+          { text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }
         ],
         [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
       ];
@@ -320,8 +316,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
         startDate: dateStr,
         returnDate: '',
         status: 'ACTIVE',
-        note: note || 'Telegram 1-Click 簽到',
-        notes: note || 'Telegram 1-Click 簽到'
+        note: note || '無備註',
+        notes: note || '無備註'
       };
 
       state.records.unshift(newRecord);
@@ -443,6 +439,51 @@ async function processTelegramUpdate(update, token, baseUrl) {
     }
 
     const state = await getCloudState(baseUrl);
+
+    // 若正處於 步驟 4/4 等待手動輸入備註狀態，則將使用者發送的訊息視為自訂備註並完成簽到
+    if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_note' && !msgText.startsWith('/')) {
+      const draft = tempDrafts[chatId];
+      const note = msgText;
+      const carId = draft.carId || 'v1';
+      const carPlate = draft.carPlate || 'ALZ-3759';
+      const driver = draft.driver || '同仁';
+      const passenger = draft.passenger || '';
+      const mileage = draft.mileage || 42850;
+
+      const now = new Date();
+      const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+      const passengersArr = passenger ? [passenger] : [];
+
+      const newRecord = {
+        id: 'rec-' + Date.now(),
+        carId: carId,
+        plate: carPlate,
+        date: dateYMD,
+        shift: '早班',
+        driver: driver,
+        passengers: passengersArr,
+        purpose: note,
+        destination: '',
+        startMileage: mileage,
+        endMileage: null,
+        startDate: dateStr,
+        returnDate: '',
+        status: 'ACTIVE',
+        note: note,
+        notes: note
+      };
+
+      state.records.unshift(newRecord);
+      await saveCloudState(baseUrl, state);
+
+      delete tempDrafts[chatId];
+
+      const psgStr = passenger ? passenger : '無乘客 (單人出車)';
+      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driver}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
+      return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+    }
 
     // 處理出車簽到文字指令：/signin 車號 駕駛 乘客 備註
     if (msgText.startsWith('/signin') || msgText.startsWith('簽到')) {
