@@ -1314,6 +1314,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const mergeStateData = (cloudState) => {
+    if (!cloudState) return false;
+
+    let hasNewData = false;
+
+    // 輔助：陣列依 ID 智慧雙向合併 (避免 Telegram Bot 紀錄被本機快取覆蓋)
+    const mergeById = (localArr, cloudArr) => {
+      if (!cloudArr || !Array.isArray(cloudArr)) return localArr || [];
+      if (!localArr || !Array.isArray(localArr)) return cloudArr || [];
+
+      const map = new Map();
+      localArr.forEach(item => { if (item && item.id) map.set(item.id, item); });
+      cloudArr.forEach(item => {
+        if (item && item.id) {
+          if (!map.has(item.id)) hasNewData = true;
+          map.set(item.id, item);
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    state.records = mergeById(state.records, cloudState.records);
+    state.fuelTransactions = mergeById(state.fuelTransactions, cloudState.fuelTransactions);
+    state.vehicles = mergeById(state.vehicles, cloudState.vehicles);
+    state.fuelCards = mergeById(state.fuelCards, cloudState.fuelCards);
+    state.personnel = mergeById(state.personnel, cloudState.personnel);
+    state.maintenanceRecords = mergeById(state.maintenanceRecords, cloudState.maintenanceRecords);
+
+    return hasNewData;
+  };
+
   const triggerCloudSyncPull = async (isBackground = false) => {
     if (isSyncing) return;
     isSyncing = true;
@@ -1323,18 +1354,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(SYNC_API_URL);
       if (res.ok) {
         const json = await res.json();
-        if (json && json.state && json.timestamp) {
-          // 如果雲端資料的時間戳記新於本機，則自動合併下載並更新介面
-          if (json.timestamp > lastLocalUpdateTime) {
-            state.records = json.state.records || state.records;
-            state.vehicles = json.state.vehicles || state.vehicles;
-            state.fuelTransactions = json.state.fuelTransactions || state.fuelTransactions;
-            state.fuelCards = json.state.fuelCards || state.fuelCards;
-            state.personnel = json.state.personnel || state.personnel;
-            state.maintenanceRecords = json.state.maintenanceRecords || state.maintenanceRecords;
+        if (json && json.state) {
+          const hasNewData = mergeStateData(json.state);
+          const isNewer = json.timestamp && (json.timestamp > lastLocalUpdateTime);
 
-            lastLocalUpdateTime = json.timestamp;
-            localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
+          if (hasNewData || isNewer) {
+            if (json.timestamp) {
+              lastLocalUpdateTime = Math.max(lastLocalUpdateTime, json.timestamp);
+              localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
+            }
 
             localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
             localStorage.setItem(STORAGE_KEY_VEHICLES, JSON.stringify(state.vehicles));
@@ -1357,21 +1385,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // 手動點擊「雲端同步」按鈕
+  // 手動點擊「雲端同步」按鈕：先 PULL 下載並智慧合併 Telegram 異動，再 PUSH 本機狀態
   const btnManualCloudSync = document.getElementById('btnManualCloudSync');
   if (btnManualCloudSync) {
     btnManualCloudSync.addEventListener('click', () => {
-      triggerCloudSyncPush().then(() => triggerCloudSyncPull(false));
+      triggerCloudSyncPull(false).then(() => triggerCloudSyncPush());
     });
   }
 
   // 初始載入與頁面返回前景時自動抓取雲端最新資料
   triggerCloudSyncPull(false);
 
-  // 定時背景自動比對同步 (每 8 秒自動輪詢雲端)
+  // 定時背景自動比對同步 (每 4 秒自動輪詢雲端，確保 Telegram Bot 紀錄即時呈現)
   setInterval(() => {
     triggerCloudSyncPull(true);
-  }, 8000);
+  }, 4000);
 
   // 切換回分頁時自動同步
   document.addEventListener('visibilitychange', () => {
