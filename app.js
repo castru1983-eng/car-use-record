@@ -1932,6 +1932,19 @@ document.addEventListener('DOMContentLoaded', () => {
       selectCar.innerHTML += `<option value="${v.id}" ${presetCarId === v.id ? 'selected' : ''}>${v.plate} - ${v.model}</option>`;
     });
 
+    // 填入加油人員下拉選單
+    const personSelect = document.getElementById('fuelTxPersonSelect');
+    if (personSelect) {
+      personSelect.innerHTML = '';
+      if (!state.personnel || state.personnel.length === 0) {
+        personSelect.innerHTML = '<option value="駕駛同仁">駕駛同仁</option>';
+      } else {
+        state.personnel.forEach(p => {
+          personSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        });
+      }
+    }
+
     document.getElementById('fuelTxType').value = presetType;
 
     const updateCardDefaults = () => {
