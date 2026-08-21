@@ -457,14 +457,20 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: buttons });
     }
 
-    // 加油選油卡 -> 選擇加油金額
+    // 加油選油卡 -> 選擇/輸入加油金額
     if (data.startsWith('fl_card_')) {
       const cardId = data.replace('fl_card_', '');
       const card = state.fuelCards.find(c => c.id === cardId);
 
-      tempDrafts[chatId] = { cardId, cardNo: card ? card.cardNo : '油卡', balance: card ? (card.balance || 0) : 0, boundCarId: card ? card.boundCarId : '' };
+      tempDrafts[chatId] = {
+        cardId,
+        cardNo: card ? card.cardNo : '油卡',
+        balance: card ? (card.balance || 0) : 0,
+        boundCarId: card ? card.boundCarId : '',
+        step: 'awaiting_fuel_amount'
+      };
 
-      let text = `💳 選擇油卡：<b>${tempDrafts[chatId].cardNo}</b> (當前餘額: NT$ ${tempDrafts[chatId].balance.toLocaleString()})\n\n<b>【步驟 2/3】請點選加油金額：</b>`;
+      let text = `💳 選擇油卡：<b>${tempDrafts[chatId].cardNo}</b> (當前餘額: NT$ ${tempDrafts[chatId].balance.toLocaleString()})\n\n<b>【步驟 2/3】請直接在對話框輸入加油金額：</b>\n<i>（例如：直接輸入 1500 或 1230 傳送）</i>\n\n<i>或可點選熱門金額：</i>`;
       const amtButtons = [
         [
           { text: '⛽ $500', callback_data: 'fl_amt_500' },
@@ -600,6 +606,30 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const psgStr = passengers.length > 0 ? passengers.join(', ') : '無乘客 (單人出車)';
       const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${drvStr}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
       return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
+    }
+
+    // 若正處於 步驟 2/3 等待手動輸入加油金額狀態，則解析輸入之金額數字並進入步驟 3/3
+    if (tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_amount' && !msgText.startsWith('/')) {
+      const amount = parseInt(msgText.replace(/[^0-9]/g, ''));
+      if (!amount || isNaN(amount) || amount <= 0) {
+        return sendMessage(token, chatId, '⚠️ <b>無效的金額數字</b>\n\n請直接輸入數字金額，例如：<code>1500</code> 或 <code>1230</code>');
+      }
+
+      tempDrafts[chatId].amount = amount;
+      tempDrafts[chatId].step = 'awaiting_fuel_person';
+
+      let text = `💳 油卡：<b>${tempDrafts[chatId].cardNo || '油卡'}</b>\n💰 加油金額：<b>NT$ ${amount.toLocaleString()}</b>\n\n<b>【步驟 3/3】請點選加油經辦同仁：</b>`;
+      const pButtons = [];
+      for (let i = 0; i < state.personnel.length; i += 3) {
+        const row = state.personnel.slice(i, i + 3).map(p => ({
+          text: `👤 ${p.name}`,
+          callback_data: `fl_person_${p.name}`
+        }));
+        pButtons.push(row);
+      }
+      pButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+
+      return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
     }
 
     // 處理出車簽到文字指令：/signin 車號 駕駛 乘客 備註
