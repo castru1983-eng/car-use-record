@@ -190,6 +190,9 @@
           </div>
 
           <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary btnOpenAddFuelCard" style="background: #047857; color: #ffffff; border-color: #047857;">
+              <i class="fa-solid fa-credit-card"></i> 新增實體油卡
+            </button>
             <button class="btn btn-primary" id="btnOpenAddFuelTx" style="background: #059669; border-color: #059669;">
               <i class="fa-solid fa-gas-pump"></i> 新增加油 / 儲值異動紀錄
             </button>
@@ -216,7 +219,7 @@
               <i class="fa-solid fa-credit-card"></i>
             </div>
             <div>
-              <div style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">綁定油卡數量</div>
+              <div style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">登記油卡數量</div>
               <div style="font-size: 1.35rem; font-weight: 700; color: #1e3a8a; margin-top: 0.1rem;" id="statFuelCardCount">0 張</div>
             </div>
           </div>
@@ -229,6 +232,21 @@
               <div style="font-size: 0.8rem; color: #991b1b; font-weight: 600;">本月加油總花費</div>
               <div style="font-size: 1.35rem; font-weight: 700; color: #7f1d1d; margin-top: 0.1rem;" id="statMonthFuelExpense">NT$ 0</div>
             </div>
+          </div>
+        </div>
+
+        <!-- 實體油卡管理與餘額明細區塊 -->
+        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+              <i class="fa-solid fa-credit-card" style="color: #059669;"></i> 實體油卡管理與卡片餘額明細
+            </h3>
+            <button class="btn btn-secondary btnOpenAddFuelCard" style="padding: 0.35rem 0.8rem; font-size: 0.82rem;">
+              <i class="fa-solid fa-plus"></i> 新增實體油卡
+            </button>
+          </div>
+          <div id="fuelCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.85rem;">
+            <!-- 動態載入油卡卡片列表 -->
           </div>
         </div>
 
@@ -259,11 +277,12 @@
             <thead>
               <tr>
                 <th>日期</th>
-                <th>車輛 / 油卡卡號</th>
+                <th>使用油卡</th>
+                <th>加油車輛</th>
                 <th>類別</th>
                 <th>里程數</th>
                 <th>加油金額</th>
-                <th>剩餘金額</th>
+                <th>卡片剩餘金額</th>
                 <th>記錄者</th>
                 <th>車況 (備註)</th>
                 <th style="text-align: right;">操作</th>
@@ -670,7 +689,14 @@
 
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">選擇車輛與對應油卡 <span class="required">*</span></label>
+            <label class="form-label">選擇扣款/儲值油卡 <span class="required">*</span></label>
+            <select class="select-control" id="fuelTxCardId" required>
+              <!-- 動態載入油卡選單 -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">加油/對應車輛 <span class="required">*</span></label>
             <select class="select-control" id="fuelTxCarId" required>
               <!-- 動態載入車輛選單 -->
             </select>
@@ -924,5 +950,56 @@
 
   <!-- JavaScript 主邏輯 -->
   <script src="app.js?v=29"></script>
+  <!-- ==========================================================================
+       彈窗 Modal 4.6: 實體油卡新增 / 編輯彈窗
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalFuelCard">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalFuelCardTitle">
+          <i class="fa-solid fa-credit-card" style="color: #059669;"></i> 新增實體油卡資料
+        </h3>
+        <button class="btn-close-modal" id="btnCloseFuelCardModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formFuelCard">
+        <input type="hidden" id="fuelCardEditId" value="">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">油卡名稱 / 卡號 <span class="required">*</span></label>
+            <input type="text" class="input-control" id="fuelCardNameNo" placeholder="例：中油捷利卡 #8839-2041" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">預設綁定車輛</label>
+            <select class="select-control" id="fuelCardBoundCarId">
+              <!-- 動態載入車輛選單 -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">當前卡片餘額 (NT$) <span class="required">*</span></label>
+            <input type="number" class="input-control" id="fuelCardBalance" placeholder="例：2900" min="0" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">保管人 / 備註說明</label>
+            <input type="text" class="input-control" id="fuelCardNote" placeholder="例：總務課專人保管 / 捷利卡加值專用">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelFuelCard">取消</button>
+          <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669;">
+            <i class="fa-solid fa-floppy-disk"></i> 儲存油卡資料
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </body>
 </html>
