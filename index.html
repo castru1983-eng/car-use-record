@@ -708,6 +708,37 @@
             <label class="form-label">車況 / 備註 <span style="font-size:0.78rem; color:var(--text-muted); font-weight:normal;">(紙本表格之「車況」)</span></label>
             <input type="text" class="input-control" id="fuelTxNote" placeholder="ex: 左後方燈罩下有... / 站名發票說明">
           </div>
+
+          <!-- 儀表板里程 / 發票佐證照片上傳區 -->
+          <div class="form-group">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-camera" style="color: #059669;"></i> 儀表板里程 / 發票照片 (拍照佐證)</span>
+              <span style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted);">手機拍照紀錄儀表板或發票</span>
+            </label>
+            
+            <div class="photo-upload-dropzone" id="fuelPhotoDropzone" style="border: 2px dashed #a7f3d0; border-radius: var(--radius-md); padding: 1rem; text-align: center; background: #f0fdf4; transition: var(--transition-fast); cursor: pointer;">
+              <i class="fa-solid fa-camera-retro" style="font-size: 1.8rem; color: #059669; margin-bottom: 0.3rem;"></i>
+              <div style="font-size: 0.88rem; font-weight: 700; color: #065f46;">點擊拍照或選擇儀表板/發票照片</div>
+              <div style="font-size: 0.76rem; color: #047857; margin-top: 0.2rem;">留下當下儀表里程紀錄佐證</div>
+              
+              <div style="display: flex; gap: 0.6rem; justify-content: center; margin-top: 0.75rem; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" id="btnTriggerFuelCamera" style="padding: 0.4rem 0.9rem; font-size: 0.85rem; background: #059669; border-color: #059669;">
+                  <i class="fa-solid fa-camera"></i> 手機即時拍照
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnTriggerFuelFileSelect" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">
+                  <i class="fa-solid fa-folder-open"></i> 選擇圖片
+                </button>
+              </div>
+
+              <input type="file" id="fuelPhotoInput" accept="image/*" multiple style="display: none;">
+              <input type="file" id="fuelCameraInput" accept="image/*" capture="environment" style="display: none;">
+            </div>
+
+            <!-- 暫存照片縮圖預覽 -->
+            <div id="fuelPhotoPreviewGallery" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.65rem;">
+              <!-- 動態載入照片縮圖 -->
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer">

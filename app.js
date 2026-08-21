@@ -61,10 +61,10 @@ const EXCEL_IMPORTED_MAINTENANCE_RECORDS = [
   { id: "maint-13", date: "2023-02-17 18:48", category: "維修", title: "公務車左後輪插到釘子 已補胎完成", content: "", status: "COMPLETED" }
 ];
 
-// 預設示範油卡儲值與加油紀錄
+// 預設示範油卡儲值與加油紀錄 (含里程照片佐證)
 const EXCEL_IMPORTED_FUEL_TRANSACTIONS = [
-  { id: 'ft-101', carId: 'v1', type: 'TOPUP', amount: 5000, date: '2026-08-01 09:00', balanceAfter: 5000, note: '總務處統一油卡預付儲值' },
-  { id: 'ft-102', carId: 'v1', type: 'EXPENSE', amount: 1500, date: '2026-08-10 17:30', balanceAfter: 3500, note: '台灣中油西屯站 / 駕駛：林大為 / 發票：AB88921021' }
+  { id: 'ft-101', carId: 'v1', type: 'TOPUP', amount: 5000, date: '2026-08-01 09:00', balanceAfter: 5000, note: '總務處統一油卡預付儲值', photos: [] },
+  { id: 'ft-102', carId: 'v1', type: 'EXPENSE', amount: 1500, mileage: 42850, date: '2026-08-10 17:30', balanceAfter: 3500, note: '台灣中油西屯站 / 發票：AB88921021', photos: [generateSamplePhotoDataUrl('儀表板加油里程 42,850 km 照片佐證', '#059669', '⛽')] }
 ];
 
 // 預設固定公務車輛
@@ -702,6 +702,15 @@ function renderFuelCardManagement() {
 
     const mileageDisplay = tx.mileage ? `${Number(tx.mileage).toLocaleString()} km` : '-';
 
+    let photosHtml = '';
+    if (tx.photos && tx.photos.length > 0) {
+      photosHtml = `<div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 0.35rem; flex-wrap: wrap;">`;
+      tx.photos.forEach(pUrl => {
+        photosHtml += `<img src="${pUrl}" class="btn-preview-photo" src-photo="${pUrl}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #a7f3d0; cursor: pointer;" title="點擊全螢幕放大檢視儀表板/發票佐證照片">`;
+      });
+      photosHtml += `<span style="font-size:0.75rem; color:#059669; font-weight:700;"><i class="fa-solid fa-camera"></i> 里程照片 (${tx.photos.length})</span></div>`;
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><div style="font-weight:700;">${tx.date}</div></td>
@@ -711,7 +720,7 @@ function renderFuelCardManagement() {
       <td><span style="font-weight:700; color:${amtColor};">${amtStr}</span></td>
       <td><strong>NT$ ${(tx.balanceAfter || 0).toLocaleString()}</strong></td>
       <td><div style="font-weight:700; color:#1e293b;"><i class="fa-solid fa-user-circle" style="color:var(--primary-color);"></i> ${tx.person || '未紀錄'}</div></td>
-      <td><div style="font-size:0.85rem; color:#475569;">${tx.note || '-'}</div></td>
+      <td><div style="font-size:0.85rem; color:#475569;">${tx.note || '-'}</div>${photosHtml}</td>
       <td style="text-align: right;">
         <button class="btn btn-icon btn-delete-fuel-tx" data-id="${tx.id}" title="刪除此筆交易">
           <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
@@ -1567,15 +1576,112 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ------------------------------------------------------------------------
-  // F.2 油卡與加油交易紀錄 Modal 控制
+  // F.2 油卡與加油交易紀錄 Modal 控制與照片拍照佐證
   // ------------------------------------------------------------------------
   const modalFuelTx = document.getElementById('modalFuelTx');
   const formFuelTx = document.getElementById('formFuelTx');
+  let currentFuelPhotos = [];
+
+  function renderFuelPhotoPreviews() {
+    const container = document.getElementById('fuelPhotoPreviewGallery');
+    if (!container) return;
+    container.innerHTML = '';
+
+    currentFuelPhotos.forEach((photoUrl, idx) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.display = 'inline-block';
+
+      wrapper.innerHTML = `
+        <img src="${photoUrl}" class="btn-preview-photo" src-photo="${photoUrl}" style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid #a7f3d0; cursor: pointer;" title="點擊全螢幕放大檢視儀表板/發票照片">
+        <button type="button" class="btn-remove-fuel-photo" data-index="${idx}" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.25);" title="刪除此照片">✕</button>
+      `;
+      container.appendChild(wrapper);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.btn-remove-fuel-photo');
+    if (removeBtn) {
+      const idx = parseInt(removeBtn.getAttribute('data-index'));
+      currentFuelPhotos.splice(idx, 1);
+      renderFuelPhotoPreviews();
+    }
+  });
+
+  const btnTriggerFuelCamera = document.getElementById('btnTriggerFuelCamera');
+  const btnTriggerFuelFileSelect = document.getElementById('btnTriggerFuelFileSelect');
+  const fuelPhotoInput = document.getElementById('fuelPhotoInput');
+  const fuelCameraInput = document.getElementById('fuelCameraInput');
+  const fuelPhotoDropzone = document.getElementById('fuelPhotoDropzone');
+
+  const handleFuelFilesUpload = async (files) => {
+    if (!files || !files.length) return;
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        const compressedData = await compressImageFile(file, 800, 0.75);
+        currentFuelPhotos.push(compressedData);
+      } catch (err) {
+        console.error('加油照片讀取壓縮失敗:', err);
+      }
+    }
+    renderFuelPhotoPreviews();
+  };
+
+  if (btnTriggerFuelCamera && fuelCameraInput) {
+    btnTriggerFuelCamera.addEventListener('click', (e) => {
+      e.preventDefault();
+      fuelCameraInput.click();
+    });
+  }
+
+  if (btnTriggerFuelFileSelect && fuelPhotoInput) {
+    btnTriggerFuelFileSelect.addEventListener('click', (e) => {
+      e.preventDefault();
+      fuelPhotoInput.click();
+    });
+  }
+
+  if (fuelPhotoInput) {
+    fuelPhotoInput.addEventListener('change', (e) => handleFuelFilesUpload(e.target.files));
+  }
+  if (fuelCameraInput) {
+    fuelCameraInput.addEventListener('change', (e) => handleFuelFilesUpload(e.target.files));
+  }
+
+  if (fuelPhotoDropzone) {
+    fuelPhotoDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      fuelPhotoDropzone.style.background = '#d1fae5';
+    });
+    fuelPhotoDropzone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      fuelPhotoDropzone.style.background = '#f0fdf4';
+    });
+    fuelPhotoDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      fuelPhotoDropzone.style.background = '#f0fdf4';
+      if (e.dataTransfer && e.dataTransfer.files) {
+        handleFuelFilesUpload(e.dataTransfer.files);
+      }
+    });
+  }
 
   const openFuelTxModal = (txId = '', presetCarId = '') => {
     if (!formFuelTx || !modalFuelTx) return;
     formFuelTx.reset();
     document.getElementById('fuelTxEditId').value = txId;
+    currentFuelPhotos = [];
+
+    if (txId) {
+      const tx = state.fuelTransactions.find(t => t.id === txId);
+      if (tx && tx.photos) {
+        currentFuelPhotos = [...tx.photos];
+      }
+    }
+
+    renderFuelPhotoPreviews();
 
     const selectCar = document.getElementById('fuelTxCarId');
     selectCar.innerHTML = '';
@@ -1685,7 +1791,8 @@ document.addEventListener('DOMContentLoaded', () => {
         balanceAfter: balanceAfter,
         person: person,
         date: date,
-        note: note
+        note: note,
+        photos: [...currentFuelPhotos]
       };
 
       state.fuelTransactions.unshift(newTx);
