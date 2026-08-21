@@ -645,21 +645,9 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">綁定油卡卡號 (Fuel Card No.)</label>
-            <input type="text" class="input-control" id="vehicleFuelCardNo" placeholder="例：中油加油卡 #8839-2041">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">油卡當前餘額 (NT$)</label>
-            <input type="number" class="input-control" id="vehicleFuelCardBalance" placeholder="例：3500" min="0" value="0">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">狀態</label>
-            <select class="select-control" id="vehicleStatus">
-              <option value="AVAILABLE">🟢 可正常出勤</option>
-              <option value="MAINTENANCE">🔧 進廠定期保養中</option>
-              <option value="OUT_OF_SERVICE">🔴 暫停使用</option>
+            <label class="form-label">綁定實體油卡 (選擇已有油卡)</label>
+            <select class="select-control" id="vehicleFuelCardSelect">
+              <!-- 動態載入已有實體油卡選單 -->
             </select>
           </div>
         </div>

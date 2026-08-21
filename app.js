@@ -592,20 +592,17 @@ function renderVehicles() {
     filterSelect.innerHTML += `<option value="${v.id}" ${state.selectedCarId === v.id ? 'selected' : ''}>${v.plate} - ${v.model}</option>`;
     formCarSelect.innerHTML += `<option value="${v.id}">${v.plate} (${v.type} - ${v.model})</option>`;
 
-    // 車輛卡片渲染
-    let statusBadge = `<span class="vehicle-status-tag available">🟢 可正常出勤</span>`;
-    if (v.status === 'MAINTENANCE') {
-      statusBadge = `<span class="vehicle-status-tag" style="background:#fef3c7; color:#b45309;">🔧 定期保養中</span>`;
-    } else if (v.status === 'OUT_OF_SERVICE') {
-      statusBadge = `<span class="vehicle-status-tag" style="background:#fee2e2; color:#b91c1c;">🔴 停用中</span>`;
-    }
+    // 尋找綁定之實體油卡
+    const boundCard = state.fuelCards.find(c => c.id === v.fuelCardId || c.boundCarId === v.id || c.cardNo === v.fuelCardNo);
+    const cardNoDisplay = boundCard ? boundCard.cardNo : (v.fuelCardNo || '未綁定油卡');
+    const cardBalDisplay = boundCard ? (boundCard.balance || 0) : (v.fuelCardBalance || 0);
 
     const card = document.createElement('div');
     card.className = 'vehicle-card';
     card.innerHTML = `
       <div class="vehicle-card-header">
         <span class="vehicle-plate">${v.plate}</span>
-        ${statusBadge}
+        <span class="vehicle-status-tag available">🟢 可正常出勤</span>
       </div>
       <div>
         <div style="font-weight: 700; font-size: 1.05rem;">${v.model}</div>
@@ -616,10 +613,10 @@ function renderVehicles() {
       </div>
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.65rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #166534; display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
         <div>
-          <i class="fa-solid fa-credit-card" style="color: #059669;"></i> <strong>${v.fuelCardNo || '未綁定油卡'}</strong>
+          <i class="fa-solid fa-credit-card" style="color: #059669;"></i> <strong>${cardNoDisplay}</strong>
         </div>
         <div style="font-size: 0.95rem; font-weight: 700; color: #047857;">
-          NT$ ${(v.fuelCardBalance || 0).toLocaleString()}
+          NT$ ${cardBalDisplay.toLocaleString()}
         </div>
       </div>
       <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; flex-wrap: wrap;">
@@ -1679,14 +1676,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // F. 車輛管理 Modal 控制
   // ------------------------------------------------------------------------
   const modalVehicle = document.getElementById('modalVehicle');
-
   const formVehicle = document.getElementById('formVehicle');
+
+  const populateVehicleFuelCardDropdown = (selectedCardId = '', vehicleId = '') => {
+    const select = document.getElementById('vehicleFuelCardSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">無綁定實體油卡</option>';
+
+    state.fuelCards.forEach(c => {
+      const boundV = state.vehicles.find(v => v.id === c.boundCarId);
+      const isThisVehicleBound = boundV && vehicleId && boundV.id === vehicleId;
+      const boundInfo = boundV ? (isThisVehicleBound ? ' [目前綁定]' : ` [已被 ${boundV.plate} 綁定]`) : '';
+      const isSelected = (selectedCardId && c.id === selectedCardId) || (selectedCardId && c.cardNo === selectedCardId);
+      select.innerHTML += `<option value="${c.id}" ${isSelected ? 'selected' : ''}>${c.cardNo}${boundInfo} (餘額 NT$ ${c.balance.toLocaleString()})</option>`;
+    });
+  };
 
   const btnOpenVeh = document.getElementById('btnOpenAddVehicle');
   if (btnOpenVeh && formVehicle) {
     btnOpenVeh.addEventListener('click', () => {
       formVehicle.reset();
       document.getElementById('vehicleEditId').value = '';
+      populateVehicleFuelCardDropdown();
       document.getElementById('modalVehicleTitle').innerText = '新增公務車資料';
       modalVehicle.classList.add('active');
     });
@@ -1698,47 +1709,65 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCancelVeh = document.getElementById('btnCancelVehicle');
   if (btnCancelVeh && modalVehicle) btnCancelVeh.addEventListener('click', () => modalVehicle.classList.remove('active'));
 
-  formVehicle.addEventListener('submit', (e) => {
-    e.preventDefault();
+  if (formVehicle) {
+    formVehicle.addEventListener('submit', (e) => {
+      e.preventDefault();
 
-    const editId = document.getElementById('vehicleEditId').value;
-    const plate = document.getElementById('vehiclePlate').value.trim().toUpperCase();
-    const model = document.getElementById('vehicleModel').value.trim();
-    const type = document.getElementById('vehicleType').value;
-    const mileage = parseInt(document.getElementById('vehicleCurrentMileage').value) || 0;
-    const fuelCardNo = document.getElementById('vehicleFuelCardNo').value.trim();
-    const fuelCardBalance = parseInt(document.getElementById('vehicleFuelCardBalance').value) || 0;
-    const status = document.getElementById('vehicleStatus').value;
+      const editId = document.getElementById('vehicleEditId').value;
+      const plate = document.getElementById('vehiclePlate').value.trim().toUpperCase();
+      const model = document.getElementById('vehicleModel').value.trim();
+      const type = document.getElementById('vehicleType').value;
+      const mileage = parseInt(document.getElementById('vehicleCurrentMileage').value) || 0;
+      const selectedCardId = document.getElementById('vehicleFuelCardSelect').value;
 
-    if (editId) {
-      const v = state.vehicles.find(item => item.id === editId);
-      if (v) {
-        v.plate = plate;
-        v.model = model;
-        v.type = type;
-        v.mileage = mileage;
-        v.fuelCardNo = fuelCardNo;
-        v.fuelCardBalance = fuelCardBalance;
-        v.status = status;
+      const selectedCard = state.fuelCards.find(c => c.id === selectedCardId);
+      const fuelCardNo = selectedCard ? selectedCard.cardNo : '';
+      const fuelCardBalance = selectedCard ? selectedCard.balance : 0;
+
+      let targetVehicleId = editId;
+
+      if (editId) {
+        const v = state.vehicles.find(item => item.id === editId);
+        if (v) {
+          v.plate = plate;
+          v.model = model;
+          v.type = type;
+          v.mileage = mileage;
+          v.fuelCardId = selectedCardId;
+          v.fuelCardNo = fuelCardNo;
+          v.fuelCardBalance = fuelCardBalance;
+        }
+      } else {
+        targetVehicleId = 'v-' + Date.now();
+        const newV = {
+          id: targetVehicleId,
+          plate: plate,
+          model: model,
+          type: type,
+          mileage: mileage,
+          fuelCardId: selectedCardId,
+          fuelCardNo: fuelCardNo,
+          fuelCardBalance: fuelCardBalance,
+          status: 'AVAILABLE'
+        };
+        state.vehicles.push(newV);
       }
-    } else {
-      const newV = {
-        id: 'v-' + Date.now(),
-        plate: plate,
-        model: model,
-        type: type,
-        mileage: mileage,
-        fuelCardNo: fuelCardNo,
-        fuelCardBalance: fuelCardBalance,
-        status: status
-      };
-      state.vehicles.push(newV);
-    }
 
-    saveVehicles();
-    refreshApp();
-    modalVehicle.classList.remove('active');
-  });
+      // 雙向同步更新實體油卡 boundCarId 關係
+      state.fuelCards.forEach(c => {
+        if (selectedCardId && c.id === selectedCardId) {
+          c.boundCarId = targetVehicleId;
+        } else if (c.boundCarId === targetVehicleId) {
+          c.boundCarId = '';
+        }
+      });
+
+      saveFuelCards();
+      saveVehicles();
+      refreshApp();
+      modalVehicle.classList.remove('active');
+    });
+  }
 
   // 編輯與刪除車輛
   document.addEventListener('click', (e) => {
@@ -1752,11 +1781,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('vehicleModel').value = v.model;
         document.getElementById('vehicleType').value = v.type;
         document.getElementById('vehicleCurrentMileage').value = v.mileage;
-        const elCardNo = document.getElementById('vehicleFuelCardNo');
-        if (elCardNo) elCardNo.value = v.fuelCardNo || '';
-        const elCardBal = document.getElementById('vehicleFuelCardBalance');
-        if (elCardBal) elCardBal.value = v.fuelCardBalance || 0;
-        document.getElementById('vehicleStatus').value = v.status;
+
+        // 下拉選單填入並選取對應油卡
+        const boundCard = state.fuelCards.find(c => c.id === v.fuelCardId || c.boundCarId === v.id || c.cardNo === v.fuelCardNo);
+        populateVehicleFuelCardDropdown(boundCard ? boundCard.id : '', v.id);
+
         document.getElementById('modalVehicleTitle').innerText = '編輯公務車資料';
         modalVehicle.classList.add('active');
       }
