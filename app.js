@@ -277,10 +277,12 @@ function loadData() {
 
 function savePersonnel() {
   localStorage.setItem(STORAGE_KEY_PERSONNEL, JSON.stringify(state.personnel));
+  if (typeof triggerCloudSyncPush === 'function') triggerCloudSyncPush();
 }
 
 function saveFuelTransactions() {
   localStorage.setItem(STORAGE_KEY_FUEL_TX, JSON.stringify(state.fuelTransactions));
+  if (typeof triggerCloudSyncPush === 'function') triggerCloudSyncPush();
 }
 
 // 產生範例事件照片 Data URL
@@ -312,14 +314,17 @@ function generateSamplePhotoDataUrl(text, color = '#2563eb', icon = '📷') {
 
 function saveRecords() {
   localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
+  if (typeof triggerCloudSyncPush === 'function') triggerCloudSyncPush();
 }
 
 function saveVehicles() {
   localStorage.setItem(STORAGE_KEY_VEHICLES, JSON.stringify(state.vehicles));
+  if (typeof triggerCloudSyncPush === 'function') triggerCloudSyncPush();
 }
 
 function saveMaintenance() {
   localStorage.setItem(STORAGE_KEY_MAINTENANCE, JSON.stringify(state.maintenanceRecords));
+  if (typeof triggerCloudSyncPush === 'function') triggerCloudSyncPush();
 }
 
 // ==========================================================================
@@ -1178,6 +1183,119 @@ document.addEventListener('DOMContentLoaded', () => {
       setMobileMode(!isMobileNow);
     });
   }
+
+  // ------------------------------------------------------------------------
+  // A.2 跨裝置雲端資料即時同步引擎 (Cloud Auto Sync Engine)
+  // ------------------------------------------------------------------------
+  const SYNC_API_URL = '/api/sync';
+  let isSyncing = false;
+  let lastLocalUpdateTime = parseInt(localStorage.getItem('last_local_update_time') || '0');
+
+  const updateCloudSyncStatusUI = (statusText, statusColor = '#34d399') => {
+    const el = document.getElementById('cloudSyncStatus');
+    if (el) {
+      el.innerHTML = `<i class="fa-solid fa-cloud" style="color: ${statusColor};"></i> <span>${statusText}</span>`;
+    }
+  };
+
+  window.triggerCloudSyncPush = async () => {
+    try {
+      lastLocalUpdateTime = Date.now();
+      localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
+
+      const payloadState = {
+        records: state.records,
+        vehicles: state.vehicles,
+        fuelTransactions: state.fuelTransactions,
+        personnel: state.personnel,
+        maintenanceRecords: state.maintenanceRecords
+      };
+
+      updateCloudSyncStatusUI('雲端同步中...', '#60a5fa');
+
+      const res = await fetch(SYNC_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: payloadState,
+          timestamp: lastLocalUpdateTime
+        })
+      });
+
+      if (res.ok) {
+        updateCloudSyncStatusUI('雲端已同步', '#34d399');
+      } else {
+        updateCloudSyncStatusUI('雲端同步重試中', '#fbbf24');
+      }
+    } catch (err) {
+      console.warn('雲端上傳同步暫時離線:', err);
+      updateCloudSyncStatusUI('本機儲存 (離線)', '#94a3b8');
+    }
+  };
+
+  const triggerCloudSyncPull = async (isBackground = false) => {
+    if (isSyncing) return;
+    isSyncing = true;
+    try {
+      if (!isBackground) updateCloudSyncStatusUI('檢查雲端更新...', '#60a5fa');
+
+      const res = await fetch(SYNC_API_URL);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.state && json.timestamp) {
+          // 如果雲端資料的時間戳記新於本機，則自動合併下載並更新介面
+          if (json.timestamp > lastLocalUpdateTime) {
+            state.records = json.state.records || state.records;
+            state.vehicles = json.state.vehicles || state.vehicles;
+            state.fuelTransactions = json.state.fuelTransactions || state.fuelTransactions;
+            state.personnel = json.state.personnel || state.personnel;
+            state.maintenanceRecords = json.state.maintenanceRecords || state.maintenanceRecords;
+
+            lastLocalUpdateTime = json.timestamp;
+            localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
+
+            localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
+            localStorage.setItem(STORAGE_KEY_VEHICLES, JSON.stringify(state.vehicles));
+            localStorage.setItem(STORAGE_KEY_FUEL_TX, JSON.stringify(state.fuelTransactions));
+            localStorage.setItem(STORAGE_KEY_PERSONNEL, JSON.stringify(state.personnel));
+            localStorage.setItem(STORAGE_KEY_MAINTENANCE, JSON.stringify(state.maintenanceRecords));
+
+            refreshApp();
+            updateCloudSyncStatusUI('雲端已同步', '#34d399');
+          } else {
+            if (!isBackground) updateCloudSyncStatusUI('已是最新資料', '#34d399');
+          }
+        }
+      }
+    } catch (err) {
+      if (!isBackground) updateCloudSyncStatusUI('本機快取模式', '#94a3b8');
+    } finally {
+      isSyncing = false;
+    }
+  };
+
+  // 手動點擊「雲端同步」按鈕
+  const btnManualCloudSync = document.getElementById('btnManualCloudSync');
+  if (btnManualCloudSync) {
+    btnManualCloudSync.addEventListener('click', () => {
+      triggerCloudSyncPush().then(() => triggerCloudSyncPull(false));
+    });
+  }
+
+  // 初始載入與頁面返回前景時自動抓取雲端最新資料
+  triggerCloudSyncPull(false);
+
+  // 定時背景自動比對同步 (每 8 秒自動輪詢雲端)
+  setInterval(() => {
+    triggerCloudSyncPull(true);
+  }, 8000);
+
+  // 切換回分頁時自動同步
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      triggerCloudSyncPull(false);
+    }
+  });
 
   // ------------------------------------------------------------------------
   // B. 月曆控制列 (Prev/Next Month, Today, Vehicle Filter)
