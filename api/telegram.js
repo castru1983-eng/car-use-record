@@ -115,7 +115,7 @@ export default async function handler(req, res) {
 async function setBotCommands(token) {
   const url = `https://api.telegram.org/bot${token}/setMyCommands`;
   const commands = [
-    { command: 'menu', description: '📋 主選單（點按鈕操作，可釘選）' },
+    { command: 'menu', description: '📋 主選單（開啟功能選單按鈕）' },
     { command: 'signin', description: '🚗 出車簽到 / 歸還（逐步引導）' },
     { command: 'fuel', description: '⛽ 新增加油扣款（逐步引導，可拍照佐證）' },
     { command: 'out', description: '🚗 出車簽到 / 歸還（快捷入口）' }
@@ -340,7 +340,7 @@ async function completeFuelTransaction(token, chatId, draft, photos, baseUrl, st
 
 // 處理 Telegram 訊息邏輯
 async function processTelegramUpdate(update, token, baseUrl) {
-  // 自動設置指令選單（若尚未顯示 [ Menu ] 按鈕）
+  // 自動註冊 Telegram 官方 Command 列表
   setBotCommands(token).catch(() => {});
 
   // 1. 處理 Inline Button 點擊事件 (Callback Query)
@@ -653,7 +653,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return completeFuelTransaction(token, chatId, draft, photoList, baseUrl, state);
     }
 
-    // 處理文字訊息指令 (Commands / Inputs)
+    // 處理文字訊息指令 (Commands / Inputs / Permanent Keyboard)
     if (update.message.text) {
       const msgText = update.message.text.trim();
 
@@ -663,8 +663,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
         return sendMainMenu(token, chatId, baseUrl);
       }
 
-      // 指令觸發 /signin 或 /out -> 開啟互動式出車簽到【步驟 1/4】
-      if (msgText === '/signin' || msgText === '/out') {
+      // 指令或按鈕觸發 出車簽到 (/signin, /out, 🚗 出車簽到 / 歸還, 出車簽到) -> 開啟【步驟 1/4】
+      if (msgText === '/signin' || msgText === '/out' || msgText.includes('出車簽到') || msgText.includes('簽到')) {
         delete tempDrafts[chatId];
         let text = '🚗 <b>【步驟 1/4】請點選您要簽到的公務車輛：</b>';
         const buttons = state.vehicles.map(v => ([{ text: `🚗 ${v.plate} (${v.model})`, callback_data: `sn_car_${v.id}` }]));
@@ -673,8 +673,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
         return sendMessage(token, chatId, text, { inline_keyboard: buttons });
       }
 
-      // 指令觸發 /fuel -> 開啟互動式加油扣款【步驟 1/6】
-      if (msgText === '/fuel') {
+      // 指令或按鈕觸發 加油扣款 (/fuel, ⛽ 新增加油扣款, 新增加油扣款, 加油) -> 開啟【步驟 1/6】
+      if (msgText === '/fuel' || msgText.includes('新增加油扣款') || msgText.includes('加油扣款')) {
         delete tempDrafts[chatId];
         let text = '⛽ <b>【步驟 1/6】請點選您要使用的實體油卡：</b>';
         const buttons = state.fuelCards.map(c => ([{ text: `💳 ${c.cardNo} (餘額 NT$ ${(c.balance || 0).toLocaleString()})`, callback_data: `fl_card_${c.id}` }]));
@@ -790,20 +790,20 @@ async function processTelegramUpdate(update, token, baseUrl) {
   }
 }
 
-// 發送主選單 Inline Keyboard
+// 發送主選單 (相容 Telegram 所有版本：帶入底部常駐 ReplyKeyboard + InlineKeyboard)
 function sendMainMenu(token, chatId, baseUrl) {
-  const text = `🚗 <b>公務車簽到與油卡管理系統</b>\n\n歡迎使用 Telegram Bot 操作！請點擊下方按鈕或使用左下角 <b>[ Menu ]</b> 功能選單進行操作：`;
+  const text = `🚗 <b>公務車簽到與油卡管理系統</b>\n\n歡迎使用 Telegram Bot 操作！請點擊下方鍵盤按鈕或功能按鈕進行操作：`;
 
+  // 1-Click 常駐鍵盤 (相容所有 Telegram 電腦版/手機版)
   const keyboard = {
-    inline_keyboard: [
+    keyboard: [
       [
-        { text: '🚗 出車簽到 / 歸還', callback_data: 'cmd_signin' },
-        { text: '⛽ 新增加油扣款', callback_data: 'cmd_fuel' }
-      ],
-      [
-        { text: '📱 開啟 WebApp 網頁版介面', web_app: { url: baseUrl } }
+        { text: '🚗 出車簽到 / 歸還' },
+        { text: '⛽ 新增加油扣款' }
       ]
-    ]
+    ],
+    resize_keyboard: true,
+    is_persistent: true
   };
 
   return sendMessage(token, chatId, text, keyboard);
