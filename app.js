@@ -2876,6 +2876,14 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCancelExportModal.addEventListener('click', () => modalExportChoice.classList.remove('active'));
   }
 
+  // 加油紀錄頁面工具列按鈕：匯出加油紀錄 Excel 表 (依紙本格式)
+  const btnExportFuelExcel = document.getElementById('btnExportFuelExcel');
+  if (btnExportFuelExcel) {
+    btnExportFuelExcel.addEventListener('click', () => {
+      exportFuelExcelTable();
+    });
+  }
+
   // 彈窗內的兩個匯出選項按鈕
   const btnExportFuelExcelModal = document.getElementById('btnExportFuelExcelModal');
   if (btnExportFuelExcelModal) {
