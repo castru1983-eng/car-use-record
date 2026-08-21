@@ -121,6 +121,24 @@ async function sendMessage(token, chatId, text, replyMarkup = null) {
   });
 }
 
+// 輔助：編輯 Telegram 訊息內容與按鈕 (用於複選動態開關切換)
+async function editMessageText(token, chatId, messageId, text, replyMarkup = null) {
+  const url = `https://api.telegram.org/bot${token}/editMessageText`;
+  const body = {
+    chat_id: chatId,
+    message_id: messageId,
+    text: text,
+    parse_mode: 'HTML'
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
+
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
 // 輔助：回應 Callback Query
 async function answerCallbackQuery(token, callbackQueryId, text = '') {
   const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
@@ -165,12 +183,69 @@ async function saveCloudState(baseUrl, state) {
   }
 }
 
+// 駕駛複選鍵盤構建
+function buildDriverKeyboard(state, selectedDrivers) {
+  const pButtons = [];
+  for (let i = 0; i < state.personnel.length; i += 3) {
+    const row = state.personnel.slice(i, i + 3).map(p => {
+      const isSelected = selectedDrivers.includes(p.name);
+      return {
+        text: isSelected ? `✅ ${p.name}` : `👤 ${p.name}`,
+        callback_data: `tg_drv_${p.name}`
+      };
+    });
+    pButtons.push(row);
+  }
+
+  const countStr = selectedDrivers.length > 0 ? ` (已選 ${selectedDrivers.length} 人)` : ' (請點選同仁)';
+  pButtons.push([{ text: `➡️ 選好了，下一步${countStr}`, callback_data: 'sn_confirm_drivers' }]);
+  pButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+
+  return { inline_keyboard: pButtons };
+}
+
+function buildDriverText(carPlate, selectedDrivers) {
+  const driversDisplay = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '尚未選擇 (可點選多位同仁)';
+  return `🚗 選擇車輛：<b>${carPlate}</b>\n已選駕駛：<b>${driversDisplay}</b>\n\n<b>【步驟 2/4】請點選出勤駕駛（支援複選）：</b>\n<i>（可點選多位駕駛同仁，勾選完畢請按下方「➡️ 選好了，下一步」）</i>`;
+}
+
+// 乘客複選鍵盤構建
+function buildPassengerKeyboard(state, selectedDrivers, selectedPassengers) {
+  const psgButtons = [];
+
+  const otherPersonnel = state.personnel.filter(p => !selectedDrivers.includes(p.name));
+  for (let i = 0; i < otherPersonnel.length; i += 3) {
+    const row = otherPersonnel.slice(i, i + 3).map(p => {
+      const isSelected = selectedPassengers.includes(p.name);
+      return {
+        text: isSelected ? `✅ ${p.name}` : `👥 ${p.name}`,
+        callback_data: `tg_psg_${p.name}`
+      };
+    });
+    psgButtons.push(row);
+  }
+
+  psgButtons.push([{ text: '🚫 無同行乘客 (單人出車)', callback_data: 'sn_psg_none' }]);
+  const countStr = selectedPassengers.length > 0 ? ` (已選 ${selectedPassengers.length} 人)` : '';
+  psgButtons.push([{ text: `➡️ 選好了，下一步${countStr}`, callback_data: 'sn_confirm_passengers' }]);
+  psgButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+
+  return { inline_keyboard: psgButtons };
+}
+
+function buildPassengerText(carPlate, selectedDrivers, selectedPassengers) {
+  const driversDisplay = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '無';
+  const psgDisplay = selectedPassengers.length > 0 ? selectedPassengers.join(', ') : '無乘客 (可點選多位)';
+  return `🚗 車輛：<b>${carPlate}</b>\n👤 駕駛：<b>${driversDisplay}</b>\n已選乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 3/4】請點選同行乘客（支援複選）：</b>\n<i>（可點選多位乘客，勾選完畢請按「➡️ 選好了，下一步」或「🚫 無同行乘客」）</i>`;
+}
+
 // 處理 Telegram 訊息邏輯
 async function processTelegramUpdate(update, token, baseUrl) {
   // 1. 處理 Inline Button 點擊事件 (Callback Query)
   if (update.callback_query) {
     const cb = update.callback_query;
     const chatId = cb.message.chat.id;
+    const messageId = cb.message.message_id;
     const data = cb.data;
 
     await answerCallbackQuery(token, cb.id);
@@ -178,6 +253,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
     const state = await getCloudState(baseUrl);
 
     if (data === 'cmd_menu') {
+      delete tempDrafts[chatId];
       return sendMainMenu(token, chatId, baseUrl);
     }
 
@@ -203,8 +279,9 @@ async function processTelegramUpdate(update, token, baseUrl) {
       activeRecords.forEach(r => {
         const v = state.vehicles ? state.vehicles.find(veh => veh.id === r.carId) : null;
         const carName = v ? `${v.plate} (${v.model})` : '公務車';
+        const drvStr = Array.isArray(r.driver) ? r.driver.join(', ') : (r.driver || '同仁');
         const psgStr = (r.passengers && r.passengers.length > 0) ? r.passengers.join(', ') : '無';
-        text += `• <b>${carName}</b>\n  👤 駕駛：${r.driver || '同仁'}\n  👥 乘客：${psgStr}\n  📝 備註：${r.note || r.purpose || '無'}\n  📏 出車里程：${r.startMileage ? r.startMileage.toLocaleString() + ' km' : '-'}\n  ⏱️ 簽到時間：${r.startDate || ''}\n\n`;
+        text += `• <b>${carName}</b>\n  👤 駕駛：${drvStr}\n  👥 乘客：${psgStr}\n  📝 備註：${r.note || r.purpose || '無'}\n  📏 出車里程：${r.startMileage ? r.startMileage.toLocaleString() + ' km' : '-'}\n  ⏱️ 簽到時間：${r.startDate || ''}\n\n`;
       });
       return sendMessage(token, chatId, text, getBackMenuKeyboard(baseUrl));
     }
@@ -219,65 +296,106 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: buttons });
     }
 
-    // 步驟 2/4: 選擇駕駛
+    // 步驟 2/4: 開始選擇駕駛 (進入駕駛複選)
     if (data.startsWith('sn_car_')) {
       const carId = data.replace('sn_car_', '');
       const vehicle = state.vehicles.find(v => v.id === carId);
 
-      tempDrafts[chatId] = { carId, carPlate: vehicle ? vehicle.plate : '公務車', mileage: vehicle ? (vehicle.mileage || 42850) : 42850 };
+      tempDrafts[chatId] = {
+        carId,
+        carPlate: vehicle ? vehicle.plate : '公務車',
+        mileage: vehicle ? (vehicle.mileage || 42850) : 42850,
+        drivers: [],
+        passengers: []
+      };
 
-      let text = `🚗 選擇車輛：<b>${tempDrafts[chatId].carPlate}</b>\n\n<b>【步驟 2/4】請點選出勤駕駛姓名：</b>`;
-      const pButtons = [];
-      for (let i = 0; i < state.personnel.length; i += 3) {
-        const row = state.personnel.slice(i, i + 3).map(p => ({
-          text: `👤 ${p.name}`,
-          callback_data: `sn_driver_${p.name}`
-        }));
-        pButtons.push(row);
-      }
-      pButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+      const text = buildDriverText(tempDrafts[chatId].carPlate, tempDrafts[chatId].drivers);
+      const keyboard = buildDriverKeyboard(state, tempDrafts[chatId].drivers);
 
-      return sendMessage(token, chatId, text, { inline_keyboard: pButtons });
+      return sendMessage(token, chatId, text, keyboard);
     }
 
-    // 步驟 3/4: 選擇同行乘客
-    if (data.startsWith('sn_driver_')) {
-      const driverName = data.replace('sn_driver_', '');
-      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
-      tempDrafts[chatId].driver = driverName;
+    // 駕駛複選按鈕 Toggle
+    if (data.startsWith('tg_drv_')) {
+      const name = data.replace('tg_drv_', '');
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
+      if (!tempDrafts[chatId].drivers) tempDrafts[chatId].drivers = [];
 
-      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${driverName}</b>\n\n<b>【步驟 3/4】請點選同行乘客 (如有)：</b>`;
-      
-      const psgButtons = [];
-      psgButtons.push([{ text: '🚫 無同行乘客 (單人出車)', callback_data: 'sn_psg_none' }]);
-
-      const otherPersonnel = state.personnel.filter(p => p.name !== driverName);
-      for (let i = 0; i < otherPersonnel.length; i += 3) {
-        const row = otherPersonnel.slice(i, i + 3).map(p => ({
-          text: `👥 ${p.name}`,
-          callback_data: `sn_psg_${p.name}`
-        }));
-        psgButtons.push(row);
+      const idx = tempDrafts[chatId].drivers.indexOf(name);
+      if (idx >= 0) {
+        tempDrafts[chatId].drivers.splice(idx, 1);
+      } else {
+        tempDrafts[chatId].drivers.push(name);
       }
-      psgButtons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
 
-      return sendMessage(token, chatId, text, { inline_keyboard: psgButtons });
+      const text = buildDriverText(tempDrafts[chatId].carPlate || '公務車', tempDrafts[chatId].drivers);
+      const keyboard = buildDriverKeyboard(state, tempDrafts[chatId].drivers);
+
+      return editMessageText(token, chatId, messageId, text, keyboard);
     }
 
-    // 步驟 4/4: 選擇/輸入備註說明
-    if (data.startsWith('sn_psg_')) {
-      const psg = data.replace('sn_psg_', '');
-      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
-      tempDrafts[chatId].passenger = (psg === 'none') ? '' : psg;
+    // 確認駕駛選擇 -> 進入步驟 3/4 乘客複選
+    if (data === 'sn_confirm_drivers') {
+      const draft = tempDrafts[chatId] || {};
+      const drivers = draft.drivers || [];
+
+      if (drivers.length === 0) {
+        return answerCallbackQuery(token, cb.id, '⚠️ 請至少點選一位駕駛同仁！');
+      }
+
+      const text = buildPassengerText(draft.carPlate || '公務車', drivers, draft.passengers || []);
+      const keyboard = buildPassengerKeyboard(state, drivers, draft.passengers || []);
+
+      return sendMessage(token, chatId, text, keyboard);
+    }
+
+    // 乘客複選按鈕 Toggle
+    if (data.startsWith('tg_psg_')) {
+      const name = data.replace('tg_psg_', '');
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
+      if (!tempDrafts[chatId].passengers) tempDrafts[chatId].passengers = [];
+
+      const idx = tempDrafts[chatId].passengers.indexOf(name);
+      if (idx >= 0) {
+        tempDrafts[chatId].passengers.splice(idx, 1);
+      } else {
+        tempDrafts[chatId].passengers.push(name);
+      }
+
+      const text = buildPassengerText(tempDrafts[chatId].carPlate || '公務車', tempDrafts[chatId].drivers || [], tempDrafts[chatId].passengers);
+      const keyboard = buildPassengerKeyboard(state, tempDrafts[chatId].drivers || [], tempDrafts[chatId].passengers);
+
+      return editMessageText(token, chatId, messageId, text, keyboard);
+    }
+
+    // 點擊「無同行乘客」 -> 清空乘客並進入步驟 4/4 備註
+    if (data === 'sn_psg_none') {
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
+      tempDrafts[chatId].passengers = [];
       tempDrafts[chatId].step = 'awaiting_note';
 
-      const psgDisplay = tempDrafts[chatId].passenger ? tempDrafts[chatId].passenger : '無乘客';
-      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${tempDrafts[chatId].driver || '同仁'}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
-      
+      const driversDisplay = tempDrafts[chatId].drivers.length > 0 ? tempDrafts[chatId].drivers.join(', ') : '同仁';
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>無乘客 (單人出車)</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
+
       const noteButtons = [
-        [
-          { text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }
-        ],
+        [{ text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }],
+        [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+      ];
+
+      return sendMessage(token, chatId, text, { inline_keyboard: noteButtons });
+    }
+
+    // 確認乘客選擇 -> 進入步驟 4/4 備註
+    if (data === 'sn_confirm_passengers') {
+      if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
+      tempDrafts[chatId].step = 'awaiting_note';
+
+      const driversDisplay = tempDrafts[chatId].drivers.length > 0 ? tempDrafts[chatId].drivers.join(', ') : '同仁';
+      const psgDisplay = tempDrafts[chatId].passengers.length > 0 ? tempDrafts[chatId].passengers.join(', ') : '無乘客';
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b>\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
+
+      const noteButtons = [
+        [{ text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }],
         [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
       ];
 
@@ -290,8 +408,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const draft = tempDrafts[chatId] || {};
       const carId = draft.carId || 'v1';
       const carPlate = draft.carPlate || 'ALZ-3759';
-      const driver = draft.driver || '同仁';
-      const passenger = draft.passenger || '';
+      const drivers = draft.drivers && draft.drivers.length > 0 ? draft.drivers : ['同仁'];
+      const passengers = draft.passengers || [];
       const mileage = draft.mileage || 42850;
       const note = (rawNote === '無備註') ? '' : rawNote;
 
@@ -299,16 +417,14 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
       const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-      const passengersArr = passenger ? [passenger] : [];
-
       const newRecord = {
         id: 'rec-' + Date.now(),
         carId: carId,
         plate: carPlate,
         date: dateYMD,
         shift: '早班',
-        driver: driver,
-        passengers: passengersArr,
+        driver: drivers,
+        passengers: passengers,
         purpose: note || '公務外勤',
         destination: '',
         startMileage: mileage,
@@ -325,9 +441,10 @@ async function processTelegramUpdate(update, token, baseUrl) {
 
       delete tempDrafts[chatId];
 
-      const psgStr = passenger ? passenger : '無乘客 (單人出車)';
+      const drvStr = drivers.join(', ');
+      const psgStr = passengers.length > 0 ? passengers.join(', ') : '無乘客 (單人出車)';
       const noteStr = note ? note : '無備註';
-      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driver}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${noteStr}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
+      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${drvStr}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${noteStr}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
       return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
     }
 
@@ -435,6 +552,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
     const msgText = update.message.text.trim();
 
     if (msgText.startsWith('/start') || msgText.startsWith('/help') || msgText === '選單' || msgText === '功能') {
+      delete tempDrafts[chatId];
       return sendMainMenu(token, chatId, baseUrl);
     }
 
@@ -446,15 +564,13 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const note = msgText;
       const carId = draft.carId || 'v1';
       const carPlate = draft.carPlate || 'ALZ-3759';
-      const driver = draft.driver || '同仁';
-      const passenger = draft.passenger || '';
+      const drivers = draft.drivers && draft.drivers.length > 0 ? draft.drivers : ['同仁'];
+      const passengers = draft.passengers || [];
       const mileage = draft.mileage || 42850;
 
       const now = new Date();
       const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
       const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      const passengersArr = passenger ? [passenger] : [];
 
       const newRecord = {
         id: 'rec-' + Date.now(),
@@ -462,8 +578,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
         plate: carPlate,
         date: dateYMD,
         shift: '早班',
-        driver: driver,
-        passengers: passengersArr,
+        driver: drivers,
+        passengers: passengers,
         purpose: note,
         destination: '',
         startMileage: mileage,
@@ -480,8 +596,9 @@ async function processTelegramUpdate(update, token, baseUrl) {
 
       delete tempDrafts[chatId];
 
-      const psgStr = passenger ? passenger : '無乘客 (單人出車)';
-      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driver}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
+      const drvStr = drivers.join(', ');
+      const psgStr = passengers.length > 0 ? passengers.join(', ') : '無乘客 (單人出車)';
+      const replyText = `✅ <b>出車簽到完成！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${drvStr}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>簽到時間：</b> ${dateStr}`;
       return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
     }
 
@@ -493,8 +610,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
       }
 
       let carQuery = parts[0];
-      let driver = parts[1];
-      let passenger = parts[2] || '';
+      let driverStr = parts[1];
+      let passengerStr = parts[2] || '';
       let note = parts.slice(3).join(' ') || 'Telegram Bot 簽到';
 
       let vehicle = null;
@@ -513,7 +630,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
       const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-      const passengersArr = passenger ? [passenger] : [];
+      const driversArr = driverStr.split(',').map(s => s.trim()).filter(Boolean);
+      const passengersArr = passengerStr ? passengerStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
       const newRecord = {
         id: 'rec-' + Date.now(),
@@ -521,7 +639,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
         plate: carPlate,
         date: dateYMD,
         shift: '早班',
-        driver: driver,
+        driver: driversArr.length > 0 ? driversArr : ['同仁'],
         passengers: passengersArr,
         purpose: note || '公務外勤',
         destination: '',
@@ -537,8 +655,8 @@ async function processTelegramUpdate(update, token, baseUrl) {
       state.records.unshift(newRecord);
       await saveCloudState(baseUrl, state);
 
-      const psgStr = passenger ? passenger : '無乘客 (單人出車)';
-      const replyText = `✅ <b>出車簽到成功！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driver}\n👥 <b>同行乘客：</b> ${psgStr}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>時間：</b> ${dateStr}`;
+      const psgDisplay = passengersArr.length > 0 ? passengersArr.join(', ') : '無乘客 (單人出車)';
+      const replyText = `✅ <b>出車簽到成功！</b>\n\n🚗 <b>車輛：</b> ${carPlate}\n👤 <b>駕駛：</b> ${driversArr.join(', ')}\n👥 <b>同行乘客：</b> ${psgDisplay}\n📝 <b>備註：</b> ${note}\n📏 <b>起始里程：</b> ${mileage.toLocaleString()} km\n⏱️ <b>時間：</b> ${dateStr}`;
       return sendMessage(token, chatId, replyText, getBackMenuKeyboard(baseUrl));
     }
 
