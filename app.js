@@ -442,7 +442,8 @@ function renderCalendar() {
 
     // 取得當天對應紀錄
     const dayRecords = state.records.filter(r => {
-      if (r.date !== dateFormatted) return false;
+      const recDate = r.date || (r.startDate ? r.startDate.split(' ')[0] : '');
+      if (recDate !== dateFormatted) return false;
       if (state.selectedCarId !== 'ALL' && r.carId !== state.selectedCarId) return false;
       return true;
     });
@@ -1336,6 +1337,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     state.records = mergeById(state.records, cloudState.records);
+    state.records.forEach(r => {
+      if (r) {
+        if (!r.date && r.startDate) r.date = r.startDate.split(' ')[0];
+        if (!r.plate && r.carId) {
+          const v = state.vehicles.find(veh => veh.id === r.carId);
+          if (v) r.plate = v.plate;
+        }
+      }
+    });
+
     state.fuelTransactions = mergeById(state.fuelTransactions, cloudState.fuelTransactions);
     state.vehicles = mergeById(state.vehicles, cloudState.vehicles);
     state.fuelCards = mergeById(state.fuelCards, cloudState.fuelCards);

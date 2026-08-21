@@ -300,23 +300,28 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const note = (rawNote === '無備註') ? '' : rawNote;
 
       const now = new Date();
-      const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+      const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
       const passengersArr = passenger ? [passenger] : [];
 
       const newRecord = {
         id: 'rec-' + Date.now(),
         carId: carId,
+        plate: carPlate,
+        date: dateYMD,
+        shift: '早班',
         driver: driver,
         passengers: passengersArr,
-        shift: '早班',
-        purpose: note || '公務出勤',
+        purpose: note || '公務外勤',
         destination: '',
         startMileage: mileage,
         endMileage: null,
         startDate: dateStr,
         returnDate: '',
-        note: note || 'Telegram 1-Click 簽到'
+        status: 'ACTIVE',
+        note: note || 'Telegram 1-Click 簽到',
+        notes: note || 'Telegram 1-Click 簽到'
       };
 
       state.records.unshift(newRecord);
@@ -464,23 +469,28 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const mileage = vehicle ? (vehicle.mileage || 42850) : 42850;
 
       const now = new Date();
-      const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+      const dateYMD = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      const dateStr = dateYMD + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
       const passengersArr = passenger ? [passenger] : [];
 
       const newRecord = {
         id: 'rec-' + Date.now(),
         carId: carId,
+        plate: carPlate,
+        date: dateYMD,
+        shift: '早班',
         driver: driver,
         passengers: passengersArr,
-        shift: '早班',
-        purpose: note,
+        purpose: note || '公務外勤',
         destination: '',
         startMileage: mileage,
         endMileage: null,
         startDate: dateStr,
         returnDate: '',
-        note: note
+        status: 'ACTIVE',
+        note: note || 'Telegram Bot 簽到',
+        notes: note || 'Telegram Bot 簽到'
       };
 
       state.records.unshift(newRecord);
