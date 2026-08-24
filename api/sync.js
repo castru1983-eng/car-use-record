@@ -1,4 +1,4 @@
-// Vercel Serverless Function: 跨裝置即時雲端資料同步 API API (/api/sync.js)
+// Vercel Serverless Function: Supabase 雲端資料庫雙向同步 API (/api/sync.js)
 
 const DEFAULT_STATE = {
   vehicles: [
@@ -43,11 +43,68 @@ const DEFAULT_STATE = {
   maintenanceRecords: []
 };
 
-let globalSyncData = null;
-let lastSyncTime = 0;
+// Supabase 環境變數
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_KEY = (process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+// 記憶體快取 (做為二次備用)
+let inMemoryData = null;
+let inMemoryTime = 0;
+
+// 從 Supabase PostgreSQL 讀取狀態
+async function getSupabaseState() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/system_state?id=eq.main&select=*`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && data[0].state) {
+        return {
+          state: data[0].state,
+          timestamp: data[0].timestamp || Date.now()
+        };
+      }
+    }
+  } catch (err) {
+    console.error('Supabase read error:', err);
+  }
+  return null;
+}
+
+// 寫入/更新至 Supabase PostgreSQL 雲端資料庫
+async function saveSupabaseState(state, timestamp) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false;
+  try {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/system_state`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: 'main',
+        state: state,
+        timestamp: timestamp || Date.now(),
+        updated_at: new Date().toISOString()
+      })
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Supabase save error:', err);
+  }
+  return false;
+}
 
 export default async function handler(req, res) {
-  // 允許所有跨網域 (CORS) 存取，方便手機與電腦端雙向同步
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -56,16 +113,25 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // 1. POST: 手機/電腦/Telegram 推送最新狀態至雲端資料庫
   if (req.method === 'POST') {
     try {
       const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
       if (payload && payload.state) {
-        globalSyncData = payload.state;
-        lastSyncTime = payload.timestamp || Date.now();
+        const ts = payload.timestamp || Date.now();
+        inMemoryData = payload.state;
+        inMemoryTime = ts;
+
+        // 同步寫入 Supabase 雲端資料庫
+        if (SUPABASE_URL && SUPABASE_KEY) {
+          await saveSupabaseState(payload.state, ts);
+        }
+
         return res.status(200).json({
           success: true,
-          message: '雲端同步資料儲存成功',
-          timestamp: lastSyncTime
+          message: SUPABASE_URL ? '已成功儲存至 Supabase 雲端資料庫' : '已儲存至記憶體',
+          db: SUPABASE_URL ? 'supabase' : 'memory',
+          timestamp: ts
         });
       } else {
         return res.status(400).json({ error: '無效的資料格式' });
@@ -75,16 +141,35 @@ export default async function handler(req, res) {
     }
   }
 
+  // 2. GET: 拉取雲端資料庫最新狀態
   if (req.method === 'GET') {
-    // 若尚未收到瀏覽器推送，預設初始化全系統預設資料
-    if (!globalSyncData) {
-      globalSyncData = DEFAULT_STATE;
-      lastSyncTime = Date.now();
+    let cloudResult = await getSupabaseState();
+
+    if (cloudResult && cloudResult.state) {
+      inMemoryData = cloudResult.state;
+      inMemoryTime = cloudResult.timestamp;
+      return res.status(200).json({
+        success: true,
+        db: 'supabase',
+        state: cloudResult.state,
+        timestamp: cloudResult.timestamp
+      });
     }
+
+    // 若 Supabase 尚無資料或尚未設定，回傳記憶體或預設資料
+    if (!inMemoryData) {
+      inMemoryData = DEFAULT_STATE;
+      inMemoryTime = Date.now();
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        await saveSupabaseState(DEFAULT_STATE, inMemoryTime);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      state: globalSyncData,
-      timestamp: lastSyncTime
+      db: SUPABASE_URL ? 'supabase' : 'memory',
+      state: inMemoryData,
+      timestamp: inMemoryTime
     });
   }
 
