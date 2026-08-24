@@ -471,7 +471,6 @@ function renderCalendar() {
           </div>
           ${driverText}
           ${passengersText}
-          ${rec.signature ? `<img src="${rec.signature}" class="record-signature-img" alt="手寫簽名">` : ''}
           ${rec.notes ? `<div class="record-note-badge" title="${rec.notes}"><i class="fa-solid fa-note-sticky"></i> ${rec.notes}</div>` : ''}
         </div>
       `;
@@ -549,16 +548,11 @@ function renderTable() {
       ? `<span class="status-badge" style="background:#f5f3ff; color:#6366f1; border:1px solid #ddd6fe;">🌙 晚班</span>`
       : `<span class="status-badge" style="background:#fffbeb; color:#d97706; border:1px solid #fef3c7;">☀️ 早班</span>`;
 
-    const sigImage = rec.signature 
-      ? `<img src="${rec.signature}" class="signature-thumb" style="max-height:36px; max-width:110px;" title="點擊查看" alt="簽名">`
-      : `<span style="color: var(--text-light); font-size: 0.8rem;">未簽名</span>`;
-
     tr.innerHTML = `
       <td>
         <div style="font-weight: 700;">${rec.date}</div>
       </td>
       <td>${shiftBadge}</td>
-      <td>${sigImage}</td>
       <td>
         <div style="font-weight: 600; color: var(--text-main);">${rec.notes || rec.destination || '無備註'}</div>
       </td>
@@ -1659,7 +1653,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <span style="color: var(--primary-color);">${rec.date} ${shiftIcon} ${shiftText}</span>
     `;
 
-    document.getElementById('detailSignatureImg').src = rec.signature || '';
+    const detailSigImg = document.getElementById('detailSignatureImg');
+    if (detailSigImg) detailSigImg.src = rec.signature || '';
     const driversStr = formatDrivers(rec.driver) || '未指定駕駛';
     const passengersStr = formatPassengers(rec.passengers) || '無同行乘客';
     document.getElementById('detailNoteBox').innerHTML = `
