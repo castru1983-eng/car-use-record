@@ -116,9 +116,9 @@ async function setBotCommands(token) {
   const url = `https://api.telegram.org/bot${token}/setMyCommands`;
   const commands = [
     { command: 'menu', description: '📋 主選單（開啟功能選單按鈕）' },
-    { command: 'signin', description: '🚗 出車簽到 / 歸還（逐步引導）' },
+    { command: 'signin', description: '🚗 出車簽到（逐步引導）' },
     { command: 'fuel', description: '⛽ 新增加油扣款（逐步引導，可拍照佐證）' },
-    { command: 'out', description: '🚗 出車簽到 / 歸還（快捷入口）' }
+    { command: 'out', description: '🚗 出車簽到（快捷入口）' }
   ];
 
   try {
@@ -798,7 +798,7 @@ function sendMainMenu(token, chatId, baseUrl) {
   const keyboard = {
     keyboard: [
       [
-        { text: '🚗 出車簽到 / 歸還' },
+        { text: '🚗 出車簽到' },
         { text: '⛽ 新增加油扣款' }
       ]
     ],
