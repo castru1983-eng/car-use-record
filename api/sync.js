@@ -43,9 +43,9 @@ const DEFAULT_STATE = {
   maintenanceRecords: []
 };
 
-// Supabase 環境變數
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
-const SUPABASE_KEY = (process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+// Supabase 雲端資料庫憑證
+const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://lhvzyxyxwtitkkrhtcmh.supabase.co').trim();
+const SUPABASE_KEY = (process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxodnp5eHl4d3RpdGtrcmh0Y21oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NDU3NDYsImV4cCI6MjEwMzEyMTc0Nn0.77OW-QTI3-RVJkATEzBiHR-PL79RWq5Ka7ckM-INm9w').trim();
 
 // 記憶體快取 (做為二次備用)
 let inMemoryData = null;
