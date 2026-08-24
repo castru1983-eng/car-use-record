@@ -1309,42 +1309,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const mergeStateData = (cloudState) => {
     if (!cloudState) return false;
 
-    let hasNewData = false;
-
-    // 輔助：陣列依 ID 智慧雙向合併 (避免 Telegram Bot 紀錄被本機快取覆蓋)
-    const mergeById = (localArr, cloudArr) => {
-      if (!cloudArr || !Array.isArray(cloudArr)) return localArr || [];
-      if (!localArr || !Array.isArray(localArr)) return cloudArr || [];
-
-      const map = new Map();
-      localArr.forEach(item => { if (item && item.id) map.set(item.id, item); });
-      cloudArr.forEach(item => {
-        if (item && item.id) {
-          if (!map.has(item.id)) hasNewData = true;
-          map.set(item.id, item);
-        }
-      });
-      return Array.from(map.values());
-    };
-
-    state.records = mergeById(state.records, cloudState.records);
+    // 接通 Supabase 雲端資料庫：以雲端資料為 100% 權威主導，防止手機舊快取倒灌
+    state.records = cloudState.records || [];
     state.records.forEach(r => {
       if (r) {
         if (!r.date && r.startDate) r.date = r.startDate.split(' ')[0];
         if (!r.plate && r.carId) {
-          const v = state.vehicles.find(veh => veh.id === r.carId);
+          const v = (cloudState.vehicles || []).find(veh => veh.id === r.carId);
           if (v) r.plate = v.plate;
         }
       }
     });
 
-    state.fuelTransactions = mergeById(state.fuelTransactions, cloudState.fuelTransactions);
-    state.vehicles = mergeById(state.vehicles, cloudState.vehicles);
-    state.fuelCards = mergeById(state.fuelCards, cloudState.fuelCards);
-    state.personnel = mergeById(state.personnel, cloudState.personnel);
-    state.maintenanceRecords = mergeById(state.maintenanceRecords, cloudState.maintenanceRecords);
+    state.fuelTransactions = cloudState.fuelTransactions || [];
+    state.vehicles = (cloudState.vehicles && cloudState.vehicles.length > 0) ? cloudState.vehicles : state.vehicles;
+    state.fuelCards = (cloudState.fuelCards && cloudState.fuelCards.length > 0) ? cloudState.fuelCards : state.fuelCards;
+    state.personnel = (cloudState.personnel && cloudState.personnel.length > 0) ? cloudState.personnel : state.personnel;
+    state.maintenanceRecords = cloudState.maintenanceRecords || [];
 
-    return hasNewData;
+    return true;
   };
 
   const triggerCloudSyncPull = async (isBackground = false) => {
