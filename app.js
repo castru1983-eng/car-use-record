@@ -615,9 +615,6 @@ function renderVehicles() {
         </div>
       </div>
       <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; flex-wrap: wrap;">
-        <button class="btn btn-secondary btn-quick-fuel-tx" data-id="${v.id}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; color: #059669; border-color: #a7f3d0; background: #ecfdf5;">
-          <i class="fa-solid fa-gas-pump"></i> 儲值/加油
-        </button>
         <button class="btn btn-secondary btn-edit-vehicle" data-id="${v.id}" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
           <i class="fa-solid fa-pen"></i> 編輯
         </button>
