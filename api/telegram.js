@@ -254,7 +254,7 @@ function buildDriverKeyboard(state, selectedDrivers) {
 function buildDriverText(carPlate, shift, selectedDrivers) {
   const shiftStr = shift ? ` (${shift === '晚班' ? '🌙' : '☀️'} ${shift})` : '';
   const driversDisplay = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '尚未選擇 (可點選多位同仁)';
-  return `🚗 車輛：<b>${carPlate}</b>${shiftStr}\n👤 已選駕駛：<b>${driversDisplay}</b>\n\n<b>【步驟 3/5】請點選出勤駕駛（支援複選）：</b>\n<i>（可點選多位駕駛同仁，勾選完畢請按下方「➡️ 選好了，下一步」）</i>`;
+  return `🚗 車輛：<b>${carPlate}</b>${shiftStr}\n👤 已選駕駛：<b>${driversDisplay}</b>\n\n<b>【步驟 2/4】請點選出勤駕駛（支援複選）：</b>\n<i>（可點選多位駕駛同仁，勾選完畢請按下方「➡️ 選好了，下一步」）</i>`;
 }
 
 // 乘客複選鍵盤構建
@@ -285,7 +285,7 @@ function buildPassengerText(carPlate, shift, selectedDrivers, selectedPassengers
   const shiftStr = shift ? ` (${shift === '晚班' ? '🌙' : '☀️'} ${shift})` : '';
   const driversDisplay = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '無';
   const psgDisplay = selectedPassengers.length > 0 ? selectedPassengers.join(', ') : '無乘客 (可點選多位)';
-  return `🚗 車輛：<b>${carPlate}</b>${shiftStr}\n👤 駕駛：<b>${driversDisplay}</b>\n👥 已選乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/5】請點選同行乘客（支援複選）：</b>\n<i>（可點選多位乘客，勾選完畢請按「➡️ 選好了，下一步」或「🚫 無同行乘客」）</i>`;
+  return `🚗 車輛：<b>${carPlate}</b>${shiftStr}\n👤 駕駛：<b>${driversDisplay}</b>\n👥 已選乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 3/4】請點選同行乘客（支援複選）：</b>\n<i>（可點選多位乘客，勾選完畢請按「➡️ 選好了，下一步」或「🚫 無同行乘客」）</i>`;
 }
 
 // 完成加油交易寫入與儲存
@@ -362,30 +362,19 @@ async function processTelegramUpdate(update, token, baseUrl) {
     }
 
     // C. 互動式出車簽到流程
-    // 步驟 1/5: 選擇車輛
+    // 點擊出車簽到 -> 直接自動帶入預設車輛，進入【步驟 1/4】選擇班別
     if (data === 'cmd_signin') {
-      let text = '🚗 <b>【步驟 1/5】請點選您要簽到的公務車輛：</b>';
-      const buttons = state.vehicles.map(v => ([{ text: `🚗 ${v.plate} (${v.model})`, callback_data: `sn_car_${v.id}` }]));
-      buttons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
-
-      return sendMessage(token, chatId, text, { inline_keyboard: buttons });
-    }
-
-    // 步驟 2/5: 選擇出勤班別 (早班 / 晚班)
-    if (data.startsWith('sn_car_')) {
-      const carId = data.replace('sn_car_', '');
-      const vehicle = state.vehicles.find(v => v.id === carId);
-
+      const vehicle = state.vehicles[0] || { id: 'v1', plate: 'ALZ-3759', mileage: 42850 };
       tempDrafts[chatId] = {
-        carId,
-        carPlate: vehicle ? vehicle.plate : '公務車',
-        mileage: vehicle ? (vehicle.mileage || 42850) : 42850,
+        carId: vehicle.id,
+        carPlate: vehicle.plate || 'ALZ-3759',
+        mileage: vehicle.mileage || 42850,
         shift: '早班',
         drivers: [],
         passengers: []
       };
 
-      let text = `🚗 選擇車輛：<b>${tempDrafts[chatId].carPlate}</b>\n\n<b>【步驟 2/5】請點選出勤班別：</b>`;
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate}</b>\n\n<b>【步驟 1/4】請點選出勤班別：</b>`;
       const shiftButtons = [
         [
           { text: '☀️ 早班', callback_data: 'sn_shift_早班' },
@@ -397,15 +386,22 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: shiftButtons });
     }
 
-    // 步驟 3/5: 開始選擇駕駛 (進入駕駛複選)
+    // 步驟 2/4: 開始選擇駕駛 (進入駕駛複選)
     if (data.startsWith('sn_shift_')) {
       const shift = data.replace('sn_shift_', '');
-      if (!tempDrafts[chatId]) tempDrafts[chatId] = {};
+      if (!tempDrafts[chatId]) {
+        const vehicle = state.vehicles[0] || { id: 'v1', plate: 'ALZ-3759', mileage: 42850 };
+        tempDrafts[chatId] = {
+          carId: vehicle.id,
+          carPlate: vehicle.plate || 'ALZ-3759',
+          mileage: vehicle.mileage || 42850
+        };
+      }
       tempDrafts[chatId].shift = shift;
       tempDrafts[chatId].drivers = [];
       tempDrafts[chatId].passengers = [];
 
-      const text = buildDriverText(tempDrafts[chatId].carPlate || '公務車', shift, tempDrafts[chatId].drivers);
+      const text = buildDriverText(tempDrafts[chatId].carPlate || 'ALZ-3759', shift, tempDrafts[chatId].drivers);
       const keyboard = buildDriverKeyboard(state, tempDrafts[chatId].drivers);
 
       return sendMessage(token, chatId, text, keyboard);
@@ -424,13 +420,13 @@ async function processTelegramUpdate(update, token, baseUrl) {
         tempDrafts[chatId].drivers.push(name);
       }
 
-      const text = buildDriverText(tempDrafts[chatId].carPlate || '公務車', tempDrafts[chatId].shift || '早班', tempDrafts[chatId].drivers);
+      const text = buildDriverText(tempDrafts[chatId].carPlate || 'ALZ-3759', tempDrafts[chatId].shift || '早班', tempDrafts[chatId].drivers);
       const keyboard = buildDriverKeyboard(state, tempDrafts[chatId].drivers);
 
       return editMessageText(token, chatId, messageId, text, keyboard);
     }
 
-    // 確認駕駛選擇 -> 進入步驟 4/5 乘客複選
+    // 確認駕駛選擇 -> 進入步驟 3/4 乘客複選
     if (data === 'sn_confirm_drivers') {
       const draft = tempDrafts[chatId] || {};
       const drivers = draft.drivers || [];
@@ -439,7 +435,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
         return answerCallbackQuery(token, cb.id, '⚠️ 請至少點選一位駕駛同仁！');
       }
 
-      const text = buildPassengerText(draft.carPlate || '公務車', draft.shift || '早班', drivers, draft.passengers || []);
+      const text = buildPassengerText(draft.carPlate || 'ALZ-3759', draft.shift || '早班', drivers, draft.passengers || []);
       const keyboard = buildPassengerKeyboard(state, drivers, draft.passengers || []);
 
       return sendMessage(token, chatId, text, keyboard);
@@ -458,13 +454,13 @@ async function processTelegramUpdate(update, token, baseUrl) {
         tempDrafts[chatId].passengers.push(name);
       }
 
-      const text = buildPassengerText(tempDrafts[chatId].carPlate || '公務車', tempDrafts[chatId].shift || '早班', tempDrafts[chatId].drivers || [], tempDrafts[chatId].passengers);
+      const text = buildPassengerText(tempDrafts[chatId].carPlate || 'ALZ-3759', tempDrafts[chatId].shift || '早班', tempDrafts[chatId].drivers || [], tempDrafts[chatId].passengers);
       const keyboard = buildPassengerKeyboard(state, tempDrafts[chatId].drivers || [], tempDrafts[chatId].passengers);
 
       return editMessageText(token, chatId, messageId, text, keyboard);
     }
 
-    // 點擊「無同行乘客」 -> 清空乘客並進入步驟 5/5 備註
+    // 點擊「無同行乘客」 -> 清空乘客並進入步驟 4/4 備註
     if (data === 'sn_psg_none') {
       if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
       tempDrafts[chatId].passengers = [];
@@ -473,7 +469,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const shiftStr = tempDrafts[chatId].shift || '早班';
       const shiftIcon = shiftStr === '晚班' ? '🌙' : '☀️';
       const driversDisplay = tempDrafts[chatId].drivers.length > 0 ? tempDrafts[chatId].drivers.join(', ') : '同仁';
-      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b> (${shiftIcon} ${shiftStr})\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>無乘客 (單人出車)</b>\n\n<b>【步驟 5/5】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || 'ALZ-3759'}</b> (${shiftIcon} ${shiftStr})\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>無乘客 (單人出車)</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
 
       const noteButtons = [
         [{ text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }],
@@ -483,7 +479,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
       return sendMessage(token, chatId, text, { inline_keyboard: noteButtons });
     }
 
-    // 確認乘客選擇 -> 進入步驟 5/5 備註
+    // 確認乘客選擇 -> 進入步驟 4/4 備註
     if (data === 'sn_confirm_passengers') {
       if (!tempDrafts[chatId]) tempDrafts[chatId] = { drivers: [], passengers: [] };
       tempDrafts[chatId].step = 'awaiting_note';
@@ -492,7 +488,7 @@ async function processTelegramUpdate(update, token, baseUrl) {
       const shiftIcon = shiftStr === '晚班' ? '🌙' : '☀️';
       const driversDisplay = tempDrafts[chatId].drivers.length > 0 ? tempDrafts[chatId].drivers.join(', ') : '同仁';
       const psgDisplay = tempDrafts[chatId].passengers.length > 0 ? tempDrafts[chatId].passengers.join(', ') : '無乘客';
-      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || '公務車'}</b> (${shiftIcon} ${shiftStr})\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 5/5】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
+      let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate || 'ALZ-3759'}</b> (${shiftIcon} ${shiftStr})\n👤 駕駛：<b>${driversDisplay}</b>\n👥 乘客：<b>${psgDisplay}</b>\n\n<b>【步驟 4/4】請點選「無備註」或直接在此對話框輸入備註內容：</b>\n<i>（亦可直接在此對話框輸入自行輸入備註文字傳送，例如：台中客戶拜訪）</i>`;
 
       const noteButtons = [
         [{ text: '📝 無備註 (點擊直接完成簽到)', callback_data: 'sn_note_無備註' }],
@@ -692,14 +688,29 @@ async function processTelegramUpdate(update, token, baseUrl) {
         return sendMainMenu(token, chatId, baseUrl);
       }
 
-      // 指令或按鈕觸發 出車簽到 (/signin, /out, 🚗 出車簽到, 出車簽到) -> 開啟【步驟 1/5】
+      // 指令或按鈕觸發 出車簽到 (/signin, /out, 🚗 出車簽到, 出車簽到) -> 自動預設車輛，開啟【步驟 1/4】
       if (msgText === '/signin' || msgText === '/out' || msgText.includes('出車簽到') || msgText.includes('簽到')) {
         delete tempDrafts[chatId];
-        let text = '🚗 <b>【步驟 1/5】請點選您要簽到的公務車輛：</b>';
-        const buttons = state.vehicles.map(v => ([{ text: `🚗 ${v.plate} (${v.model})`, callback_data: `sn_car_${v.id}` }]));
-        buttons.push([{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]);
+        const vehicle = state.vehicles[0] || { id: 'v1', plate: 'ALZ-3759', mileage: 42850 };
+        tempDrafts[chatId] = {
+          carId: vehicle.id,
+          carPlate: vehicle.plate || 'ALZ-3759',
+          mileage: vehicle.mileage || 42850,
+          shift: '早班',
+          drivers: [],
+          passengers: []
+        };
 
-        return sendMessage(token, chatId, text, { inline_keyboard: buttons });
+        let text = `🚗 車輛：<b>${tempDrafts[chatId].carPlate}</b>\n\n<b>【步驟 1/4】請點選出勤班別：</b>`;
+        const shiftButtons = [
+          [
+            { text: '☀️ 早班', callback_data: 'sn_shift_早班' },
+            { text: '🌙 晚班', callback_data: 'sn_shift_晚班' }
+          ],
+          [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
+        ];
+
+        return sendMessage(token, chatId, text, { inline_keyboard: shiftButtons });
       }
 
       // 指令或按鈕觸發 加油扣款 (/fuel, ⛽ 新增加油扣款, 新增加油扣款, 加油) -> 開啟【步驟 1/6】
