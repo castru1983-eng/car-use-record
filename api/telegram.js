@@ -6,37 +6,31 @@ const DEFAULT_STATE = {
       id: 'v1',
       plate: 'ALZ-3759',
       type: '轎車',
-      model: 'Toyota Altis',
+      model: 'Toyota innova',
       mileage: 42850,
       maintMileage: 50000,
       fuelCardId: 'fc-1',
-      fuelCardNo: '中油捷利卡 #8839-2041',
-      fuelCardBalance: 2900,
+      fuelCardNo: '中油捷利卡 #800539012005897119',
+      fuelCardBalance: 10000,
       status: 'AVAILABLE'
     }
   ],
   fuelCards: [
     {
       id: 'fc-1',
-      cardNo: '中油捷利卡 #8839-2041',
+      cardNo: '中油捷利卡 #800539012005897119',
       boundCarId: 'v1',
-      balance: 2900,
+      balance: 10000,
       note: '總務課經辦保管'
     }
   ],
   personnel: [
-    { id: 'p1', name: '林大為' },
-    { id: 'p2', name: '陳靜宜' },
-    { id: 'p3', name: '張明哲' },
-    { id: 'p4', name: '袁' },
-    { id: 'p5', name: '波' },
-    { id: 'p6', name: 'G' },
-    { id: 'p7', name: '治' },
-    { id: 'p8', name: '祿' },
-    { id: 'p9', name: '明' },
-    { id: 'p10', name: '放' },
-    { id: 'p11', name: '祥' },
-    { id: 'p12', name: '升' }
+    { id: 'p1', name: 'Simon' },
+    { id: 'p2', name: 'Uri' },
+    { id: 'p3', name: 'George' },
+    { id: 'p4', name: 'Jason' },
+    { id: 'p5', name: 'Barry' },
+    { id: 'p6', name: 'Nick' }
   ],
   records: [],
   fuelTransactions: [],

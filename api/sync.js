@@ -6,37 +6,31 @@ const DEFAULT_STATE = {
       id: 'v1',
       plate: 'ALZ-3759',
       type: '轎車',
-      model: 'Toyota Altis',
+      model: 'Toyota innova',
       mileage: 42850,
       maintMileage: 50000,
       fuelCardId: 'fc-1',
-      fuelCardNo: '中油捷利卡 #8839-2041',
-      fuelCardBalance: 2900,
+      fuelCardNo: '中油捷利卡 #800539012005897119',
+      fuelCardBalance: 10000,
       status: 'AVAILABLE'
     }
   ],
   fuelCards: [
     {
       id: 'fc-1',
-      cardNo: '中油捷利卡 #8839-2041',
+      cardNo: '中油捷利卡 #800539012005897119',
       boundCarId: 'v1',
-      balance: 2900,
+      balance: 10000,
       note: '總務課經辦保管'
     }
   ],
   personnel: [
-    { id: 'p1', name: '林大為' },
-    { id: 'p2', name: '陳靜宜' },
-    { id: 'p3', name: '張明哲' },
-    { id: 'p4', name: '袁' },
-    { id: 'p5', name: '波' },
-    { id: 'p6', name: 'G' },
-    { id: 'p7', name: '治' },
-    { id: 'p8', name: '祿' },
-    { id: 'p9', name: '明' },
-    { id: 'p10', name: '放' },
-    { id: 'p11', name: '祥' },
-    { id: 'p12', name: '升' }
+    { id: 'p1', name: 'Simon' },
+    { id: 'p2', name: 'Uri' },
+    { id: 'p3', name: 'George' },
+    { id: 'p4', name: 'Jason' },
+    { id: 'p5', name: 'Barry' },
+    { id: 'p6', name: 'Nick' }
   ],
   records: [],
   fuelTransactions: [],
@@ -52,28 +46,31 @@ const SUPABASE_KEY = (process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY 
 let inMemoryData = null;
 let inMemoryTime = 0;
 
-// 從 Supabase PostgreSQL 讀取狀態
+// 從 Supabase PostgreSQL 讀取狀態 (含重試機制)
 async function getSupabaseState() {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  try {
-    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/system_state?id=eq.main&select=*`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+  const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/system_state?id=eq.main&select=*`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0 && data[0].state) {
+          return {
+            state: data[0].state,
+            timestamp: data[0].timestamp || Date.now()
+          };
+        }
       }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0 && data[0].state) {
-        return {
-          state: data[0].state,
-          timestamp: data[0].timestamp || Date.now()
-        };
-      }
+    } catch (err) {
+      console.error(`Supabase read error (attempt ${attempt + 1}):`, err);
     }
-  } catch (err) {
-    console.error('Supabase read error:', err);
+    if (attempt < 2) await new Promise(r => setTimeout(r, 400));
   }
   return null;
 }
@@ -157,22 +154,23 @@ export default async function handler(req, res) {
       });
     }
 
-    // 若 Supabase 尚無資料或尚未設定，回傳記憶體或預設資料
-    if (!inMemoryData) {
-      inMemoryData = DEFAULT_STATE;
-      inMemoryTime = Date.now();
-      if (SUPABASE_URL && SUPABASE_KEY) {
-        await saveSupabaseState(DEFAULT_STATE, inMemoryTime);
-      }
+    // 若 Supabase 暫時無法讀取，若有記憶體快取則回傳快取
+    if (inMemoryData) {
+      return res.status(200).json({
+        success: true,
+        db: 'memory_cached',
+        state: inMemoryData,
+        timestamp: inMemoryTime
+      });
     }
 
-    return res.status(200).json({
-      success: true,
-      db: SUPABASE_URL ? 'supabase' : 'memory',
-      state: inMemoryData,
-      timestamp: inMemoryTime
+    // 若 Supabase 暫時無法讀取且無記憶體快取：絕對禁止覆寫雲端資料庫！回傳 503 避免本機快取被空資料洗掉
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase 連線暫時異常，為保護既有資料庫安全，拒絕重置資料。'
     });
   }
 
   return res.status(405).json({ error: 'Method Not Allowed' });
+}
 }

@@ -16,26 +16,20 @@ const STORAGE_KEY_FUEL_CARDS = 'car_use_fuel_cards_v10';
 const DEFAULT_FUEL_CARDS = [
   {
     id: 'fc-1',
-    cardNo: '中油捷利卡 #8839-2041',
+    cardNo: '中油捷利卡 #800539012005897119',
     boundCarId: 'v1',
-    balance: 2900,
+    balance: 10000,
     note: '總務課經辦保管'
   }
 ];
 
 const DEFAULT_PERSONNEL = [
-  { id: 'p1', name: '林大為' },
-  { id: 'p2', name: '陳靜宜' },
-  { id: 'p3', name: '張明哲' },
-  { id: 'p4', name: '袁' },
-  { id: 'p5', name: '波' },
-  { id: 'p6', name: 'G' },
-  { id: 'p7', name: '治' },
-  { id: 'p8', name: '祿' },
-  { id: 'p9', name: '明' },
-  { id: 'p10', name: '放' },
-  { id: 'p11', name: '祥' },
-  { id: 'p12', name: '升' }
+  { id: 'p1', name: 'Simon' },
+  { id: 'p2', name: 'Uri' },
+  { id: 'p3', name: 'George' },
+  { id: 'p4', name: 'Jason' },
+  { id: 'p5', name: 'Barry' },
+  { id: 'p6', name: 'Nick' }
 ];
 
 const state = {
@@ -81,7 +75,7 @@ const EXCEL_IMPORTED_FUEL_TRANSACTIONS = [
 
 // 預設固定公務車輛
 const DEFAULT_VEHICLES = [
-  { id: 'v1', plate: 'ALZ-3759', model: '公務車 (Toyota Altis)', type: '轎車', mileage: 42850, maintMileage: 50000, status: 'AVAILABLE', fuelCardNo: '中油捷利卡 #8839-2041', fuelCardBalance: 3500 }
+  { id: 'v1', plate: 'ALZ-3759', model: 'Toyota innova', type: '轎車', mileage: 42850, maintMileage: 50000, status: 'AVAILABLE', fuelCardNo: '中油捷利卡 #800539012005897119', fuelCardBalance: 10000 }
 ];
 
 // 產生預設簽名 Data URL 示範圖片 (簡單 Canvas 產生文字樣式簽名)
@@ -1270,64 +1264,98 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.triggerCloudSyncPush = async () => {
-    try {
-      lastLocalUpdateTime = Date.now();
-      localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
+  let pushDebounceTimer = null;
+  window.triggerCloudSyncPush = () => {
+    if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
+    pushDebounceTimer = setTimeout(async () => {
+      try {
+        lastLocalUpdateTime = Date.now();
+        localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
 
-      const payloadState = {
-        records: state.records,
-        vehicles: state.vehicles,
-        fuelTransactions: state.fuelTransactions,
-        fuelCards: state.fuelCards,
-        personnel: state.personnel,
-        maintenanceRecords: state.maintenanceRecords
-      };
+        const payloadState = {
+          records: state.records,
+          vehicles: state.vehicles,
+          fuelTransactions: state.fuelTransactions,
+          fuelCards: state.fuelCards,
+          personnel: state.personnel,
+          maintenanceRecords: state.maintenanceRecords
+        };
 
-      updateCloudSyncStatusUI('雲端同步中...', '#60a5fa');
+        updateCloudSyncStatusUI('雲端同步中...', '#60a5fa');
 
-      const res = await fetch(SYNC_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          state: payloadState,
-          timestamp: lastLocalUpdateTime
-        })
-      });
+        const res = await fetch(SYNC_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            state: payloadState,
+            timestamp: lastLocalUpdateTime
+          })
+        });
 
-      if (res.ok) {
-        updateCloudSyncStatusUI('雲端已同步', '#34d399');
-      } else {
-        updateCloudSyncStatusUI('雲端同步重試中', '#fbbf24');
+        if (res.ok) {
+          updateCloudSyncStatusUI('雲端已同步', '#34d399');
+        } else {
+          updateCloudSyncStatusUI('雲端同步重試中', '#fbbf24');
+        }
+      } catch (err) {
+        console.warn('雲端上傳同步暫時離線:', err);
+        updateCloudSyncStatusUI('本機儲存 (離線)', '#94a3b8');
       }
-    } catch (err) {
-      console.warn('雲端上傳同步暫時離線:', err);
-      updateCloudSyncStatusUI('本機儲存 (離線)', '#94a3b8');
-    }
+    }, 150);
   };
 
   const mergeStateData = (cloudState) => {
     if (!cloudState) return false;
 
-    // 接通 Supabase 雲端資料庫：以雲端資料為 100% 權威主導，防止手機舊快取倒灌
-    state.records = cloudState.records || [];
-    state.records.forEach(r => {
-      if (r) {
-        if (!r.date && r.startDate) r.date = r.startDate.split(' ')[0];
-        if (!r.plate && r.carId) {
-          const v = (cloudState.vehicles || []).find(veh => veh.id === r.carId);
-          if (v) r.plate = v.plate;
-        }
+    let hasChanged = false;
+
+    // 接通 Supabase 雲端資料庫：以雲端資料為準，同時具備防空資料倒灌安全機制
+    if (Array.isArray(cloudState.records)) {
+      if (cloudState.records.length > 0) {
+        state.records = cloudState.records;
+        hasChanged = true;
+      } else if (state.records.length === 0) {
+        state.records = [];
       }
-    });
+      // 防呆：若雲端是空陣列但本機已有簽到紀錄，則保留本機紀錄，絕不倒灌清空！
 
-    state.fuelTransactions = cloudState.fuelTransactions || [];
-    state.vehicles = (cloudState.vehicles && cloudState.vehicles.length > 0) ? cloudState.vehicles : state.vehicles;
-    state.fuelCards = (cloudState.fuelCards && cloudState.fuelCards.length > 0) ? cloudState.fuelCards : state.fuelCards;
-    state.personnel = (cloudState.personnel && cloudState.personnel.length > 0) ? cloudState.personnel : state.personnel;
-    state.maintenanceRecords = cloudState.maintenanceRecords || [];
+      state.records.forEach(r => {
+        if (r) {
+          if (!r.date && r.startDate) r.date = r.startDate.split(' ')[0];
+          if (!r.plate && r.carId) {
+            const v = (cloudState.vehicles || state.vehicles || []).find(veh => veh.id === r.carId);
+            if (v) r.plate = v.plate;
+          }
+        }
+      });
+    }
 
-    return true;
+    // 防倒灌：加油扣款明細同樣防止被雲端空陣列洗白
+    if (Array.isArray(cloudState.fuelTransactions)) {
+      if (cloudState.fuelTransactions.length > 0) {
+        state.fuelTransactions = cloudState.fuelTransactions;
+        hasChanged = true;
+      }
+    }
+
+    if (cloudState.vehicles && cloudState.vehicles.length > 0) {
+      state.vehicles = cloudState.vehicles;
+      hasChanged = true;
+    }
+    if (cloudState.fuelCards && cloudState.fuelCards.length > 0) {
+      state.fuelCards = cloudState.fuelCards;
+      hasChanged = true;
+    }
+    if (cloudState.personnel && cloudState.personnel.length > 0) {
+      state.personnel = cloudState.personnel;
+      hasChanged = true;
+    }
+    if (cloudState.maintenanceRecords && cloudState.maintenanceRecords.length > 0) {
+      state.maintenanceRecords = cloudState.maintenanceRecords;
+      hasChanged = true;
+    }
+
+    return hasChanged;
   };
 
   const triggerCloudSyncPull = async (isBackground = false) => {
@@ -1340,10 +1368,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         const json = await res.json();
         if (json && json.state) {
-          const hasNewData = mergeStateData(json.state);
           const isNewer = json.timestamp && (json.timestamp > lastLocalUpdateTime);
+          const hasNewData = mergeStateData(json.state);
 
-          if (hasNewData || isNewer) {
+          if (isNewer || hasNewData) {
             if (json.timestamp) {
               lastLocalUpdateTime = Math.max(lastLocalUpdateTime, json.timestamp);
               localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
@@ -2817,29 +2845,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    let csvContent = "\uFEFF單號,用車日期,車牌號碼,駕駛人,部門,目的地,事由,時段,出發里程(km),歸還里程(km),累積行駛(km),狀態,油電狀態,同行人員\n";
+    let csvContent = "\uFEFF用車日期,車牌號碼,班別,駕駛人,同行乘客,備註\n";
 
     state.records.forEach(r => {
       const driverStr = Array.isArray(r.driver) ? r.driver.join('/') : (r.driver || '');
-      const psgStr = Array.isArray(r.passengers) ? r.passengers.join('/') : (r.passengers || '');
-      const destStr = r.destination ? r.destination.replace(/"/g, '""') : '';
-      const purposeStr = (r.purpose || r.note || '').replace(/"/g, '""');
+      const psgStr = Array.isArray(r.passengers) ? r.passengers.join('/') : (r.passengers || '無');
+      const noteStr = (r.notes || r.note || r.purpose || '').replace(/"/g, '""');
+      const shiftStr = r.shift || '早班';
 
       const row = [
-        `"${r.id || ''}"`,
         `"${r.date || ''}"`,
         `"${r.plate || ''}"`,
+        `"${shiftStr}"`,
         `"${driverStr}"`,
-        `"${r.department || ''}"`,
-        `"${destStr}"`,
-        `"${purposeStr}"`,
-        `"${r.startTime || ''}-${r.endTime || ''}"`,
-        `"${r.startMileage || 0}"`,
-        `"${r.endMileage || ''}"`,
-        `"${r.totalKm || 0}"`,
-        `"${r.status === 'COMPLETED' ? '已還車簽退' : (r.status === 'ACTIVE' ? '使用出勤中' : '預約中')}"`,
-        `"${r.fuelStatus || ''}"`,
-        `"${psgStr}"`
+        `"${psgStr}"`,
+        `"${noteStr}"`
       ].join(",");
       csvContent += row + "\n";
     });
@@ -2848,7 +2868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `公務車使用簽到紀錄報表_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `公務車簽到紀錄表_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
