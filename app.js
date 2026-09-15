@@ -1251,9 +1251,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ------------------------------------------------------------------------
-  // A.2 跨裝置雲端資料即時同步引擎 (Cloud Auto Sync Engine)
+  // A.2 跨裝置雲端資料即時同步引擎 (Cloud Auto Sync Engine - 支援雙軌備援)
   // ------------------------------------------------------------------------
   const SYNC_API_URL = '/api/sync';
+  const SUPABASE_REST_URL = 'https://lhvzyxyxwtitkkrhtcmh.supabase.co/rest/v1/system_state?id=eq.main&select=*';
+  const SUPABASE_UPSERT_URL = 'https://lhvzyxyxwtitkkrhtcmh.supabase.co/rest/v1/system_state';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxodnp5eHl4d3RpdGtrcmh0Y21oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NDU3NDYsImV4cCI6MjEwMzEyMTc0Nn0.77OW-QTI3-RVJkATEzBiHR-PL79RWq5Ka7ckM-INm9w';
+
   let isSyncing = false;
   let lastLocalUpdateTime = parseInt(localStorage.getItem('last_local_update_time') || '0');
 
@@ -1262,6 +1266,82 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) {
       el.innerHTML = `<i class="fa-solid fa-cloud" style="color: ${statusColor};"></i> <span>${statusText}</span>`;
     }
+  };
+
+  // 雙重雲端寫入：優先透過 Vercel API，若離線或 local file 則直連 Supabase REST
+  const pushToCloud = async (payloadState, timestamp) => {
+    let saved = false;
+    if (window.location.protocol !== 'file:') {
+      try {
+        const res = await fetch(SYNC_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: payloadState, timestamp })
+        });
+        if (res.ok) saved = true;
+      } catch (err) {
+        console.warn('Vercel API /api/sync 寫入失敗，切換至 Supabase 直接備援:', err);
+      }
+    }
+    if (!saved) {
+      try {
+        const res = await fetch(SUPABASE_UPSERT_URL, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            id: 'main',
+            state: payloadState,
+            timestamp,
+            updated_at: new Date().toISOString()
+          })
+        });
+        if (res.ok) saved = true;
+      } catch (err) {
+        console.error('Supabase 直接寫入失敗:', err);
+      }
+    }
+    return saved;
+  };
+
+  // 雙重雲端拉取：優先透過 Vercel API，若未回應或 local file 則直連 Supabase REST
+  const pullFromCloud = async () => {
+    if (window.location.protocol !== 'file:') {
+      try {
+        const res = await fetch(SYNC_API_URL);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.state) return json;
+        }
+      } catch (err) {
+        console.warn('Vercel API /api/sync 讀取失敗，切換至 Supabase 直接備援:', err);
+      }
+    }
+    try {
+      const res = await fetch(SUPABASE_REST_URL, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0 && data[0].state) {
+          return {
+            state: data[0].state,
+            timestamp: data[0].timestamp || Date.now(),
+            db: 'supabase_direct'
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase 直接連線讀取失敗:', err);
+    }
+    return null;
   };
 
   let pushDebounceTimer = null;
@@ -1283,16 +1363,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateCloudSyncStatusUI('雲端同步中...', '#60a5fa');
 
-        const res = await fetch(SYNC_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            state: payloadState,
-            timestamp: lastLocalUpdateTime
-          })
-        });
-
-        if (res.ok) {
+        const ok = await pushToCloud(payloadState, lastLocalUpdateTime);
+        if (ok) {
           updateCloudSyncStatusUI('雲端已同步', '#34d399');
         } else {
           updateCloudSyncStatusUI('雲端同步重試中', '#fbbf24');
@@ -1364,32 +1436,31 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       if (!isBackground) updateCloudSyncStatusUI('檢查雲端更新...', '#60a5fa');
 
-      const res = await fetch(SYNC_API_URL);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.state) {
-          const isNewer = json.timestamp && (json.timestamp > lastLocalUpdateTime);
-          const hasNewData = mergeStateData(json.state);
+      const json = await pullFromCloud();
+      if (json && json.state) {
+        const isNewer = json.timestamp && (json.timestamp > lastLocalUpdateTime);
+        const hasNewData = mergeStateData(json.state);
 
-          if (isNewer || hasNewData) {
-            if (json.timestamp) {
-              lastLocalUpdateTime = Math.max(lastLocalUpdateTime, json.timestamp);
-              localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
-            }
-
-            localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
-            localStorage.setItem(STORAGE_KEY_VEHICLES, JSON.stringify(state.vehicles));
-            localStorage.setItem(STORAGE_KEY_FUEL_TX, JSON.stringify(state.fuelTransactions));
-            localStorage.setItem(STORAGE_KEY_FUEL_CARDS, JSON.stringify(state.fuelCards));
-            localStorage.setItem(STORAGE_KEY_PERSONNEL, JSON.stringify(state.personnel));
-            localStorage.setItem(STORAGE_KEY_MAINTENANCE, JSON.stringify(state.maintenanceRecords));
-
-            refreshApp();
-            updateCloudSyncStatusUI('雲端已同步', '#34d399');
-          } else {
-            if (!isBackground) updateCloudSyncStatusUI('已是最新資料', '#34d399');
+        if (isNewer || hasNewData) {
+          if (json.timestamp) {
+            lastLocalUpdateTime = Math.max(lastLocalUpdateTime, json.timestamp);
+            localStorage.setItem('last_local_update_time', String(lastLocalUpdateTime));
           }
+
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
+          localStorage.setItem(STORAGE_KEY_VEHICLES, JSON.stringify(state.vehicles));
+          localStorage.setItem(STORAGE_KEY_FUEL_TX, JSON.stringify(state.fuelTransactions));
+          localStorage.setItem(STORAGE_KEY_FUEL_CARDS, JSON.stringify(state.fuelCards));
+          localStorage.setItem(STORAGE_KEY_PERSONNEL, JSON.stringify(state.personnel));
+          localStorage.setItem(STORAGE_KEY_MAINTENANCE, JSON.stringify(state.maintenanceRecords));
+
+          refreshApp();
+          updateCloudSyncStatusUI('雲端已同步', '#34d399');
+        } else {
+          if (!isBackground) updateCloudSyncStatusUI('已是最新資料', '#34d399');
         }
+      } else {
+        if (!isBackground) updateCloudSyncStatusUI('本機快取模式', '#94a3b8');
       }
     } catch (err) {
       if (!isBackground) updateCloudSyncStatusUI('本機快取模式', '#94a3b8');
@@ -1413,6 +1484,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     triggerCloudSyncPull(true);
   }, 4000);
+
 
   // 切換回分頁時自動同步
   document.addEventListener('visibilitychange', () => {
