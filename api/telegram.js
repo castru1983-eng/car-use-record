@@ -174,18 +174,26 @@ async function answerCallbackQuery(token, callbackQueryId, text = '') {
   });
 }
 
-// 輔助：取得 Telegram 上傳照片實體 URL
-async function getTelegramFileUrl(token, fileId) {
+// 輔助：取得 Telegram 上傳照片並轉為永久 Base64 Data URL (避免 Telegram 官方暫存連結過期 404 及保護 Token)
+async function getTelegramPhotoBase64(token, fileId) {
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
     if (res.ok) {
       const data = await res.json();
       if (data.ok && data.result && data.result.file_path) {
-        return `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
+        const fileDownloadUrl = `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
+        const imgRes = await fetch(fileDownloadUrl);
+        if (imgRes.ok) {
+          const buffer = await imgRes.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString('base64');
+          const ext = (data.result.file_path.split('.').pop() || 'jpg').toLowerCase();
+          const mimeType = ext === 'png' ? 'image/png' : (ext === 'webp' ? 'image/webp' : 'image/jpeg');
+          return `data:${mimeType};base64,${base64}`;
+        }
       }
     }
   } catch (e) {
-    console.error('Error fetching Telegram file path:', e);
+    console.error('Error fetching/converting Telegram photo to base64:', e);
   }
   return null;
 }
@@ -661,13 +669,25 @@ async function processTelegramUpdate(update, token, baseUrl) {
 
     const state = await getCloudState(baseUrl);
 
-    // 處理 Telegram 直接拍照/傳送照片訊息 (步驟 6/6 照片佐證)
-    if (update.message.photo && tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_photo') {
-      const photosArr = update.message.photo;
-      const largestPhoto = photosArr[photosArr.length - 1];
-      const fileUrl = await getTelegramFileUrl(token, largestPhoto.file_id);
+    // 處理 Telegram 直接拍照/傳送照片或圖片檔案 (步驟 6/6 照片佐證)
+    const isPhotoMsg = update.message.photo && update.message.photo.length > 0;
+    const isDocPhoto = update.message.document && update.message.document.mime_type && update.message.document.mime_type.startsWith('image/');
 
-      const photoList = fileUrl ? [fileUrl] : [];
+    if ((isPhotoMsg || isDocPhoto) && tempDrafts[chatId] && tempDrafts[chatId].step === 'awaiting_fuel_photo') {
+      let fileId = null;
+      if (isPhotoMsg) {
+        const photosArr = update.message.photo;
+        let selectedPhoto = photosArr[photosArr.length - 1];
+        if (photosArr.length > 2 && selectedPhoto.file_size && selectedPhoto.file_size > 500000) {
+          selectedPhoto = photosArr[photosArr.length - 2];
+        }
+        fileId = selectedPhoto.file_id;
+      } else if (isDocPhoto) {
+        fileId = update.message.document.file_id;
+      }
+
+      const base64Photo = fileId ? await getTelegramPhotoBase64(token, fileId) : null;
+      const photoList = base64Photo ? [base64Photo] : [];
       const draft = tempDrafts[chatId];
       return completeFuelTransaction(token, chatId, draft, photoList, baseUrl, state);
     }

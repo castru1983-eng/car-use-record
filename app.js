@@ -776,7 +776,7 @@ function renderFuelCardManagement() {
     if (tx.photos && tx.photos.length > 0) {
       photosHtml = `<div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 0.35rem; flex-wrap: wrap;">`;
       tx.photos.forEach(pUrl => {
-        photosHtml += `<img src="${pUrl}" class="btn-preview-photo" src-photo="${pUrl}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #a7f3d0; cursor: pointer;" title="點擊全螢幕放大檢視儀表板/發票佐證照片">`;
+        photosHtml += `<img src="${pUrl}" class="btn-preview-photo" src-photo="${pUrl}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #a7f3d0; cursor: pointer; background: #f1f5f9;" title="點擊全螢幕放大檢視儀表板/發票佐證照片" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'44\\' height=\\'44\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%23ef4444\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\'/><line x1=\\'2\\' y1=\\'2\\' x2=\\'22\\' y2=\\'22\\'/></svg>'; this.style.borderColor='#fca5a5'; this.title='照片連結已過期 (點擊查看說明或進行編輯補傳)';">`;
       });
       photosHtml += `<span style="font-size:0.75rem; color:#059669; font-weight:700;"><i class="fa-solid fa-camera"></i> 里程照片 (${tx.photos.length})</span></div>`;
     }
@@ -792,7 +792,10 @@ function renderFuelCardManagement() {
       <td><strong>NT$ ${(tx.balanceAfter || 0).toLocaleString()}</strong></td>
       <td><div style="font-weight:700; color:#1e293b;"><i class="fa-solid fa-user-circle" style="color:var(--primary-color);"></i> ${tx.person || '未紀錄'}</div></td>
       <td><div style="font-size:0.85rem; color:#475569;">${tx.note || '-'}</div>${photosHtml}</td>
-      <td style="text-align: right;">
+      <td style="text-align: right; white-space: nowrap;">
+        <button class="btn btn-icon btn-edit-fuel-tx" data-id="${tx.id}" title="編輯此筆紀錄 / 補傳照片" style="margin-right: 4px;">
+          <i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i>
+        </button>
         <button class="btn btn-icon btn-delete-fuel-tx" data-id="${tx.id}" title="刪除此筆交易">
           <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
         </button>
@@ -2021,14 +2024,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fuelTxEditId').value = txId;
     currentFuelPhotos = [];
 
-    if (txId) {
-      const tx = state.fuelTransactions.find(t => t.id === txId);
-      if (tx && tx.photos) {
-        currentFuelPhotos = [...tx.photos];
-      }
+    const modalTitle = document.getElementById('modalFuelTxTitle');
+    if (modalTitle) {
+      modalTitle.innerHTML = txId 
+        ? '<i class="fa-solid fa-pen-to-square" style="color: #059669;"></i> 編輯加油 / 儲值紀錄'
+        : '<i class="fa-solid fa-gas-pump" style="color: #059669;"></i> 新增加油 / 儲值異動紀錄';
     }
-
-    renderFuelPhotoPreviews();
 
     // 填入油卡選單
     const selectCard = document.getElementById('fuelTxCardId');
@@ -2059,22 +2060,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    document.getElementById('fuelTxType').value = presetType;
-
-    const updateCardDefaults = () => {
-      const selectedCard = state.fuelCards.find(c => c.id === selectCard.value);
-      if (selectedCard) {
-        if (selectedCard.boundCarId) {
-          selectCar.value = selectedCard.boundCarId;
-        }
-        const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
-        if (selectedCar) {
-          document.getElementById('fuelTxMileage').value = selectedCar.mileage || '';
-        }
-        calculateBalance();
-      }
-    };
-
     const calculateBalance = () => {
       const selectedCard = state.fuelCards.find(c => c.id === selectCard.value);
       const currentBal = selectedCard ? (selectedCard.balance || 0) : 0;
@@ -2090,26 +2075,75 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('fuelTxBalanceAfter').value = estBalance;
     };
 
-    updateCardDefaults();
+    const updateCardDefaults = () => {
+      const selectedCard = state.fuelCards.find(c => c.id === selectCard.value);
+      if (selectedCard) {
+        if (selectedCard.boundCarId) {
+          selectCar.value = selectedCard.boundCarId;
+        }
+        const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
+        if (selectedCar) {
+          document.getElementById('fuelTxMileage').value = selectedCar.mileage || '';
+        }
+        calculateBalance();
+      }
+    };
 
-    selectCard.onchange = updateCardDefaults;
+    if (txId) {
+      const tx = state.fuelTransactions.find(t => t.id === txId);
+      if (tx) {
+        if (tx.photos && Array.isArray(tx.photos)) {
+          currentFuelPhotos = [...tx.photos];
+        }
+        if (tx.cardId) selectCard.value = tx.cardId;
+        if (tx.carId) selectCar.value = tx.carId;
+        document.getElementById('fuelTxType').value = tx.type || 'EXPENSE';
+        document.getElementById('fuelTxAmount').value = tx.amount != null ? tx.amount : '';
+        document.getElementById('fuelTxMileage').value = tx.mileage != null ? tx.mileage : '';
+        document.getElementById('fuelTxBalanceAfter').value = tx.balanceAfter != null ? tx.balanceAfter : '';
+        if (personSelect && tx.person) personSelect.value = tx.person;
+        document.getElementById('fuelTxNote').value = tx.note || '';
+
+        if (tx.date) {
+          const parts = tx.date.trim().split(' ');
+          const datePart = parts[0] || '';
+          const timePart = parts[1] ? (parts[1].length === 5 ? parts[1] + ':00' : parts[1]) : '00:00:00';
+          document.getElementById('fuelTxDate').value = `${datePart}T${timePart}`;
+        }
+      }
+    } else {
+      if (presetCardId) selectCard.value = presetCardId;
+      if (presetCarId) selectCar.value = presetCarId;
+      document.getElementById('fuelTxType').value = presetType;
+      
+      updateCardDefaults();
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('fuelTxDate').value = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+    }
+
+    renderFuelPhotoPreviews();
+
+    selectCard.onchange = () => {
+      if (!txId) updateCardDefaults();
+      else calculateBalance();
+    };
     selectCar.onchange = () => {
-      const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
-      if (selectedCar) {
-        document.getElementById('fuelTxMileage').value = selectedCar.mileage || '';
+      if (!txId) {
+        const selectedCar = state.vehicles.find(v => v.id === selectCar.value);
+        if (selectedCar) {
+          document.getElementById('fuelTxMileage').value = selectedCar.mileage || '';
+        }
       }
     };
     document.getElementById('fuelTxType').onchange = calculateBalance;
     document.getElementById('fuelTxAmount').oninput = calculateBalance;
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    document.getElementById('fuelTxDate').value = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 
     modalFuelTx.classList.add('active');
   };
@@ -2159,22 +2193,42 @@ document.addEventListener('DOMContentLoaded', () => {
         vehicle.mileage = mileage;
       }
 
-      const newTx = {
-        id: 'ft-' + Date.now(),
-        cardId: cardId,
-        cardNo: fuelCard.cardNo,
-        carId: carId,
-        type: type,
-        amount: amount,
-        mileage: mileage,
-        balanceAfter: balanceAfter,
-        person: person,
-        date: date,
-        note: note,
-        photos: [...currentFuelPhotos]
-      };
-
-      state.fuelTransactions.unshift(newTx);
+      const editId = document.getElementById('fuelTxEditId').value;
+      if (editId) {
+        const existingIdx = state.fuelTransactions.findIndex(t => t.id === editId);
+        if (existingIdx !== -1) {
+          state.fuelTransactions[existingIdx] = {
+            ...state.fuelTransactions[existingIdx],
+            cardId: cardId,
+            cardNo: fuelCard.cardNo,
+            carId: carId,
+            type: type,
+            amount: amount,
+            mileage: mileage,
+            balanceAfter: balanceAfter,
+            person: person,
+            date: date,
+            note: note,
+            photos: [...currentFuelPhotos]
+          };
+        }
+      } else {
+        const newTx = {
+          id: 'ft-' + Date.now(),
+          cardId: cardId,
+          cardNo: fuelCard.cardNo,
+          carId: carId,
+          type: type,
+          amount: amount,
+          mileage: mileage,
+          balanceAfter: balanceAfter,
+          person: person,
+          date: date,
+          note: note,
+          photos: [...currentFuelPhotos]
+        };
+        state.fuelTransactions.unshift(newTx);
+      }
 
       saveFuelCards();
       saveVehicles();
@@ -2314,6 +2368,15 @@ document.addEventListener('DOMContentLoaded', () => {
         saveFuelTransactions();
         refreshApp();
       }
+    }
+  });
+
+  // 編輯單筆油卡異動紀錄 (含重新補傳照片)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-edit-fuel-tx');
+    if (btn) {
+      const id = btn.getAttribute('data-id');
+      openFuelTxModal(id);
     }
   });
 
@@ -2694,12 +2757,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // 大圖 Lightbox 預覽控制
   const modalPhotoPreview = document.getElementById('modalPhotoPreview');
   const lightboxImg = document.getElementById('lightboxImg');
+  const lightboxError = document.getElementById('lightboxError');
 
   document.addEventListener('click', (e) => {
     const previewImg = e.target.closest('.btn-preview-photo');
     if (previewImg) {
       const src = previewImg.getAttribute('src-photo') || previewImg.src;
       if (lightboxImg && modalPhotoPreview) {
+        if (lightboxError) lightboxError.style.display = 'none';
+        lightboxImg.style.display = 'inline-block';
+
+        lightboxImg.onerror = () => {
+          lightboxImg.style.display = 'none';
+          if (lightboxError) lightboxError.style.display = 'block';
+        };
+        lightboxImg.onload = () => {
+          lightboxImg.style.display = 'inline-block';
+          if (lightboxError) lightboxError.style.display = 'none';
+        };
+
         lightboxImg.src = src;
         modalPhotoPreview.classList.add('active');
       }
