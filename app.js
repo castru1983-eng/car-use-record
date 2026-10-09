@@ -687,12 +687,16 @@ function renderFuelCardManagement() {
     selectCardEl.onchange = renderFuelCardManagement;
   }
 
-  if (monthPickerEl && !monthPickerEl.value) {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    monthPickerEl.value = `${y}-${m}`;
+  // 預設顯示全部月份（月份欄位留空 = 不篩選）
+  if (monthPickerEl) {
     monthPickerEl.onchange = renderFuelCardManagement;
+  }
+  const clearMonthBtn = document.getElementById('fuelMonthClearBtn');
+  if (clearMonthBtn) {
+    clearMonthBtn.onclick = () => {
+      if (monthPickerEl) monthPickerEl.value = '';
+      renderFuelCardManagement();
+    };
   }
 
   const selectedCardId = selectCardEl ? selectCardEl.value : 'ALL';
@@ -721,9 +725,11 @@ function renderFuelCardManagement() {
 
   // 3. 計算本月加油總花費
   const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const statMonth = selectedMonth || currentMonthStr;
   const monthExpenses = state.fuelTransactions.filter(tx => {
     if (tx.type !== 'EXPENSE') return false;
-    if (selectedMonth && !tx.date.startsWith(selectedMonth)) return false;
+    if (!tx.date || !tx.date.startsWith(statMonth)) return false;
     return true;
   }).reduce((acc, tx) => acc + (tx.amount || 0), 0);
   const elMonthExp = document.getElementById('statMonthFuelExpense');
@@ -2851,19 +2857,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetMonthStr = '';
     let rocYearStr = '';
 
+    let periodLabel = '全部月份';
+
     if (selectedMonth) {
       const [y, m] = selectedMonth.split('-');
       targetYearStr = y;
       targetMonthStr = m;
       rocYearStr = `${parseInt(y) - 1911}`;
-    } else {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      targetYearStr = `${y}`;
-      targetMonthStr = m;
-      rocYearStr = `${y - 1911}`;
+      periodLabel = `民國 ${rocYearStr} 年 ${parseInt(m)} 月`;
     }
+    const periodFileStr = selectedMonth ? `${targetYearStr}${targetMonthStr}` : '全部月份';
+    const fullHeaderStr = `${cardHeaderStr}　｜　期間：${periodLabel}`;
 
     // 篩選加油交易（僅包含選擇油卡之加油扣款紀錄，排除儲值）
     let filteredTx = state.fuelTransactions.filter(tx => {
@@ -2954,7 +2958,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </table>
   <table class="meta-table">
     <tr>
-      <td colspan="6" style="text-align: left; font-size: 13pt; font-weight: bold; padding: 4px;">${cardHeaderStr}</td>
+      <td colspan="6" style="text-align: left; font-size: 13pt; font-weight: bold; padding: 4px;">${fullHeaderStr}</td>
     </tr>
   </table>
   <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
@@ -2979,7 +2983,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    const filename = `公務車加油紀錄表_${plate}_${targetYearStr}${targetMonthStr}.xls`;
+    const filename = `公務車加油紀錄表_${plate}_${periodFileStr}.xls`;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
