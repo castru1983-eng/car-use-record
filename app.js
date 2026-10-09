@@ -2854,7 +2854,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const cardNoStr = headerCard ? (headerCard.cardNo || '未知油卡') : (selectedCardId !== 'ALL' ? selectedCardId : '未登記油卡');
 
     const cardHeaderStr = `車牌號碼：${boundCarPlateStr}　｜　油卡卡號：${cardNoStr}`;
-    const plate = selectedCard ? (boundCarPlateStr.split(' ')[0] + '_' + selectedCard.cardNo) : '全部油卡';
+    const platePart = headerVehicle ? headerVehicle.plate : '未綁定車輛';
+    const plate = `${platePart}_${cardNoStr}`.replace(/[\\/:*?"<>|]/g, '-');
 
     let targetYearStr = '';
     let targetMonthStr = '';
