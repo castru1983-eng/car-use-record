@@ -2989,37 +2989,131 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.removeChild(link);
   }
 
-  // 2. 匯出「簽到紀錄 CSV 報表」
+  // 2. 匯出「簽到紀錄 月曆式 Excel 報表」(依目前月曆顯示月份與車輛篩選)
   function exportSignInRecordsCsv() {
     if (state.records.length === 0) {
       alert('目前無任何簽到紀錄可匯出');
       return;
     }
 
-    let csvContent = "\uFEFF用車日期,車牌號碼,班別,駕駛人,同行乘客,備註\n";
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const BR = '<br style="mso-data-placement:same-cell;">';
 
+    const baseDate = state.currentDate instanceof Date ? state.currentDate : new Date();
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const monthStr = String(month + 1).padStart(2, '0');
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const selectedCar = state.selectedCarId && state.selectedCarId !== 'ALL'
+      ? state.vehicles.find(v => v.id === state.selectedCarId) : null;
+    const carLabel = selectedCar ? `${selectedCar.plate} (${selectedCar.model || '公務車'})` : '全部公務車';
+
+    // 依日期整理當月紀錄
+    const recordsByDate = {};
+    let monthTotal = 0;
     state.records.forEach(r => {
-      const driverStr = Array.isArray(r.driver) ? r.driver.join('/') : (r.driver || '');
-      const psgStr = Array.isArray(r.passengers) ? r.passengers.join('/') : (r.passengers || '無');
-      const noteStr = (r.notes || r.note || r.purpose || '').replace(/"/g, '""');
-      const shiftStr = r.shift || '早班';
-
-      const row = [
-        `"${r.date || ''}"`,
-        `"${r.plate || ''}"`,
-        `"${shiftStr}"`,
-        `"${driverStr}"`,
-        `"${psgStr}"`,
-        `"${noteStr}"`
-      ].join(",");
-      csvContent += row + "\n";
+      const recDate = r.date || (r.startDate ? r.startDate.split(' ')[0] : '');
+      if (!recDate.startsWith(`${year}-${monthStr}`)) return;
+      if (selectedCar && r.carId !== state.selectedCarId) return;
+      (recordsByDate[recDate] = recordsByDate[recDate] || []).push(r);
+      monthTotal++;
     });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // 建立 6 週 x 7 天的格子資料
+    const cells = [];
+    for (let i = firstDayIndex - 1; i >= 0; i--) cells.push({ day: prevMonthDays - i, other: true });
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, other: false, date: `${year}-${monthStr}-${String(d).padStart(2, '0')}` });
+    let nextDay = 1;
+    while (cells.length % 7 !== 0) cells.push({ day: nextDay++, other: true });
+
+    const renderRecords = (dateStr) => {
+      const recs = (recordsByDate[dateStr] || []).slice().sort((a, b) => {
+        const order = s => (s === '晚班' ? 1 : 0);
+        return order(a.shift || '早班') - order(b.shift || '早班');
+      });
+      return recs.map(rec => {
+        const shiftName = rec.shift || '早班';
+        const isEvening = shiftName === '晚班';
+        const color = isEvening ? '#5b21b6' : '#b45309';
+        const icon = isEvening ? '🌙' : '☀️';
+        const driver = formatDrivers(rec.driver);
+        const psg = formatPassengers(rec.passengers);
+        const note = rec.notes || rec.note || '';
+        let html = `<font color="${color}"><b>【${esc(rec.plate || '')} ${icon}${esc(shiftName)}】</b></font>`;
+        if (driver) html += `${BR}駕駛：${esc(driver)}`;
+        if (psg) html += `${BR}<font color="#64748b">乘客：${esc(psg)}</font>`;
+        if (note) html += `${BR}<font color="#475569">備註：${esc(note)}</font>`;
+        return html;
+      }).join(`${BR}${BR}`);
+    };
+
+    const weekNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    let headerRow = '<tr>' + weekNames.map((w, i) =>
+      `<th style="border:1pt solid #000; background:#e2e8f0; font-size:13pt; height:30px; color:${(i === 0 || i === 6) ? '#dc2626' : '#1e293b'};">${w}</th>`
+    ).join('') + '</tr>';
+
+    let bodyRows = '';
+    for (let w = 0; w < cells.length / 7; w++) {
+      const week = cells.slice(w * 7, w * 7 + 7);
+      // 日期列
+      bodyRows += '<tr>' + week.map((c, i) => {
+        const bg = c.other ? '#e5e7eb' : '#f8fafc';
+        const fc = c.other ? '#9ca3af' : ((i === 0 || i === 6) ? '#dc2626' : '#0f172a');
+        return `<td style="border:1pt solid #000; border-bottom:none; background:${bg}; color:${fc}; font-size:12pt; font-weight:bold; text-align:left; height:22px;">${c.day}</td>`;
+      }).join('') + '</tr>';
+      // 內容列
+      bodyRows += '<tr>' + week.map(c => {
+        const bg = c.other ? '#e5e7eb' : '#ffffff';
+        const content = c.other ? '' : renderRecords(c.date);
+        return `<td style="border:1pt solid #000; border-top:none; background:${bg}; font-size:10.5pt; text-align:left; vertical-align:top; white-space:normal; height:110px;">${content}</td>`;
+      }).join('') + '</tr>';
+    }
+
+    const excelTemplate = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]>
+<xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>簽到月曆</x:Name>
+    <x:WorksheetOptions>
+     <x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex><x:Scale>70</x:Scale></x:Print>
+     <x:FitToPage/>
+    </x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  @page { mso-page-orientation: landscape; margin: 0.4in; }
+  body { font-family: "微軟正黑體", "標楷體", Arial, sans-serif; }
+  table { border-collapse: collapse; }
+  col { width: 150pt; }
+</style>
+</head>
+<body>
+  <table>
+    <colgroup>${'<col style="width:150pt;">'.repeat(7)}</colgroup>
+    <tr><td colspan="7" style="font-size:18pt; font-weight:bold; text-align:center; height:40px;">公務車出勤簽到月曆</td></tr>
+    <tr><td colspan="7" style="font-size:13pt; font-weight:bold; text-align:left; height:28px;">月份：${year} 年 ${monthStr} 月　｜　車輛：${esc(carLabel)}　｜　本月簽到：${monthTotal} 筆　｜　<font color="#b45309">☀️早班</font>　<font color="#5b21b6">🌙晚班</font></td></tr>
+    ${headerRow}
+    ${bodyRows}
+  </table>
+</body>
+</html>`;
+
+    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `公務車簽到紀錄表_${new Date().toISOString().split('T')[0]}.csv`);
+    const carFilePart = selectedCar ? `_${selectedCar.plate}` : '';
+    link.setAttribute("download", `公務車簽到月曆_${year}${monthStr}${carFilePart}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
