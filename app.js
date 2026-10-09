@@ -2831,43 +2831,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const selectedCard = state.fuelCards ? state.fuelCards.find(c => c.id === selectedCardId) : null;
 
-    let boundCarPlateStr = '';
-    let cardNoStr = '全部實體油卡';
-
-    if (selectedCard) {
-      cardNoStr = selectedCard.cardNo || '未知油卡';
-      const boundV = state.vehicles.find(v => v.id === selectedCard.boundCarId || v.fuelCardId === selectedCard.id);
-      if (boundV) {
-        boundCarPlateStr = `${boundV.plate} (${boundV.model || '公務車'})`;
-      } else {
-        boundCarPlateStr = '全部公務車';
-      }
-    } else if (selectedCardId === 'ALL') {
-      cardNoStr = '全部實體油卡';
-      boundCarPlateStr = '全部車隊公務車';
-    } else {
-      cardNoStr = selectedCardId;
-      boundCarPlateStr = '公務車';
+    // 決定表頭要顯示的「當前油卡」：有選卡用選的卡；選全部時取最近一筆加油所用的卡，否則取第一張卡
+    const latestExpenseTx = [...(state.fuelTransactions || [])]
+      .filter(tx => tx.type === 'EXPENSE')
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    let headerCard = selectedCard;
+    if (!headerCard && state.fuelCards && state.fuelCards.length > 0) {
+      headerCard = (latestExpenseTx && state.fuelCards.find(c => c.id === latestExpenseTx.cardId || (latestExpenseTx.cardNo && c.cardNo === latestExpenseTx.cardNo)))
+        || state.fuelCards[0];
     }
+
+    // 決定表頭要顯示的「當前車輛」：油卡綁定車輛，否則取最近一筆加油的車輛
+    let headerVehicle = null;
+    if (headerCard) {
+      headerVehicle = state.vehicles.find(v => v.id === headerCard.boundCarId || v.fuelCardId === headerCard.id);
+    }
+    if (!headerVehicle && latestExpenseTx) {
+      headerVehicle = state.vehicles.find(v => v.id === latestExpenseTx.carId);
+    }
+
+    const boundCarPlateStr = headerVehicle ? `${headerVehicle.plate} (${headerVehicle.model || '公務車'})` : '未綁定車輛';
+    const cardNoStr = headerCard ? (headerCard.cardNo || '未知油卡') : (selectedCardId !== 'ALL' ? selectedCardId : '未登記油卡');
 
     const cardHeaderStr = `車牌號碼：${boundCarPlateStr}　｜　油卡卡號：${cardNoStr}`;
     const plate = selectedCard ? (boundCarPlateStr.split(' ')[0] + '_' + selectedCard.cardNo) : '全部油卡';
 
     let targetYearStr = '';
     let targetMonthStr = '';
-    let rocYearStr = '';
-
-    let periodLabel = '全部月份';
 
     if (selectedMonth) {
       const [y, m] = selectedMonth.split('-');
       targetYearStr = y;
       targetMonthStr = m;
-      rocYearStr = `${parseInt(y) - 1911}`;
-      periodLabel = `民國 ${rocYearStr} 年 ${parseInt(m)} 月`;
     }
     const periodFileStr = selectedMonth ? `${targetYearStr}${targetMonthStr}` : '全部月份';
-    const fullHeaderStr = `${cardHeaderStr}　｜　期間：${periodLabel}`;
+    const fullHeaderStr = cardHeaderStr;
 
     // 篩選加油交易（僅包含選擇油卡之加油扣款紀錄，排除儲值）
     let filteredTx = state.fuelTransactions.filter(tx => {
