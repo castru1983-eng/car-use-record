@@ -758,8 +758,8 @@ function renderFuelCardManagement() {
     return;
   }
 
-  // 排序：最新交易在最上面
-  const sortedTx = [...filteredTx].sort((a, b) => new Date(b.date) - new Date(a.date));
+  // 排序：由舊到新，最新交易在最下面（與紙本填寫順序一致）
+  const sortedTx = [...filteredTx].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   sortedTx.forEach(tx => {
     const card = state.fuelCards.find(c => c.id === tx.cardId);
