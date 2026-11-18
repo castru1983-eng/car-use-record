@@ -112,6 +112,7 @@ async function setBotCommands(token) {
     { command: 'menu', description: '📋 主選單（開啟功能選單按鈕）' },
     { command: 'signin', description: '🚗 出車簽到（逐步引導）' },
     { command: 'fuel', description: '⛽ 新增加油扣款（逐步引導，可拍照佐證）' },
+    { command: 'balance', description: '💳 查詢油卡餘額（即時餘額與明細）' },
     { command: 'out', description: '🚗 出車簽到（快捷入口）' }
   ];
 
@@ -361,6 +362,12 @@ async function processTelegramUpdate(update, token, baseUrl) {
     if (data === 'cmd_menu') {
       delete tempDrafts[chatId];
       return sendMainMenu(token, chatId, baseUrl);
+    }
+
+    // 查詢油卡餘額
+    if (data === 'cmd_balance') {
+      delete tempDrafts[chatId];
+      return sendFuelCardBalance(token, chatId, baseUrl, state);
     }
 
     // C. 互動式出車簽到流程
@@ -702,6 +709,21 @@ async function processTelegramUpdate(update, token, baseUrl) {
         return sendMainMenu(token, chatId, baseUrl);
       }
 
+      // 指令或按鈕觸發 查詢油卡餘額 (/balance, /card, 💳 查詢油卡餘額, 查詢油卡餘額, 查詢餘額, 油卡餘額, 餘額, 油卡)
+      if (
+        msgText === '/balance' ||
+        msgText === '/card' ||
+        msgText === '/status' ||
+        msgText.includes('查詢油卡餘額') ||
+        msgText.includes('油卡餘額') ||
+        msgText.includes('查詢餘額') ||
+        msgText === '餘額' ||
+        msgText === '油卡'
+      ) {
+        delete tempDrafts[chatId];
+        return sendFuelCardBalance(token, chatId, baseUrl, state);
+      }
+
       // 指令或按鈕觸發 出車簽到 (/signin, /out, 🚗 出車簽到, 出車簽到) -> 自動預設車輛，開啟【步驟 1/4】
       if (msgText === '/signin' || msgText === '/out' || msgText.includes('出車簽到') || msgText.includes('簽到')) {
         delete tempDrafts[chatId];
@@ -856,6 +878,9 @@ function sendMainMenu(token, chatId, baseUrl) {
       [
         { text: '🚗 出車簽到' },
         { text: '⛽ 新增加油扣款' }
+      ],
+      [
+        { text: '💳 查詢油卡餘額' }
       ]
     ],
     resize_keyboard: true,
@@ -865,9 +890,71 @@ function sendMainMenu(token, chatId, baseUrl) {
   return sendMessage(token, chatId, text, keyboard);
 }
 
+// 發送油卡餘額查詢訊息
+function sendFuelCardBalance(token, chatId, baseUrl, state) {
+  const cards = (state.fuelCards && state.fuelCards.length > 0) ? state.fuelCards : DEFAULT_STATE.fuelCards;
+
+  let text = `💳 <b>公務油卡餘額查詢</b>\n━━━━━━━━━━━━━━\n\n`;
+
+  let totalBalance = 0;
+
+  cards.forEach((card, idx) => {
+    const balance = (card.balance !== undefined && card.balance !== null) ? Number(card.balance) : 0;
+    totalBalance += balance;
+
+    // 尋找綁定車輛
+    const boundCar = (state.vehicles || []).find(v => v.id === card.boundCarId || v.plate === card.boundCarId);
+    const carStr = boundCar ? `${boundCar.plate} (${boundCar.model || boundCar.type || '公務車'})` : '通用 (未綁定車輛)';
+
+    // 尋找此油卡最新一筆加油交易
+    const lastTx = (state.fuelTransactions || []).find(t => t.cardId === card.id || t.cardNo === card.cardNo);
+    let lastTxStr = '尚無紀錄';
+    if (lastTx) {
+      const sign = lastTx.type === 'INCOME' ? '+' : '-';
+      lastTxStr = `${sign}NT$ ${(lastTx.amount || 0).toLocaleString()} (${lastTx.date || ''} / ${lastTx.person || '經辦'})`;
+    }
+
+    text += `💳 <b>油卡：</b> ${card.cardNo}\n`;
+    text += `💵 <b>目前餘額：</b> <b>NT$ ${balance.toLocaleString()}</b>\n`;
+    text += `🚗 <b>綁定車輛：</b> ${carStr}\n`;
+    if (card.note) {
+      text += `📌 <b>保管備註：</b> ${card.note}\n`;
+    }
+    text += `⏱️ <b>最近異動：</b> ${lastTxStr}\n`;
+
+    if (idx < cards.length - 1) {
+      text += `\n───────────────────\n\n`;
+    }
+  });
+
+  if (cards.length > 1) {
+    text += `\n━━━━━━━━━━━━━━\n`;
+    text += `💰 <b>油卡總餘額合計：</b> <b>NT$ ${totalBalance.toLocaleString()}</b>\n`;
+  }
+
+  const now = new Date();
+  const timeStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  text += `\n🕒 <i>查詢時間：${timeStr}</i>`;
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '⛽ 新增加油扣款', callback_data: 'cmd_fuel' },
+        { text: '📱 開啟 WebApp', web_app: { url: baseUrl } }
+      ],
+      [
+        { text: '🔙 返回主選單', callback_data: 'cmd_menu' }
+      ]
+    ]
+  };
+
+  return sendMessage(token, chatId, text, inlineKeyboard);
+}
+
 function getBackMenuKeyboard(baseUrl) {
   return {
     inline_keyboard: [
+      [{ text: '💳 查詢油卡餘額', callback_data: 'cmd_balance' }],
       [{ text: '📱 開啟 WebApp 網頁版', web_app: { url: baseUrl } }],
       [{ text: '🔙 返回主選單', callback_data: 'cmd_menu' }]
     ]
