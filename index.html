@@ -290,6 +290,9 @@
           </div>
 
           <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-secondary" id="btnExportMaint" title="匯出保養及狀況紀錄 Excel 報表">
+              <i class="fa-solid fa-file-excel"></i> 匯出紀錄
+            </button>
             <button class="btn btn-primary" id="btnOpenAddMaint">
               <i class="fa-solid fa-plus"></i> 新增保養/事件紀錄
             </button>
@@ -908,6 +911,14 @@
           <div>
             <div style="font-weight: 700; font-size: 1rem; color: var(--text-main);"><i class="fa-solid fa-calendar-days"></i> 匯出「公務車出勤簽到月曆報表」</div>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">依目前月曆月份與車輛，匯出月曆式 Excel（早/晚班、駕駛、乘客、備註）</div>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
+        </button>
+
+        <button type="button" class="btn btn-secondary" id="btnExportMaintModal" style="padding: 0.85rem 1rem; display: flex; align-items: center; justify-content: space-between; text-align: left; width: 100%;">
+          <div>
+            <div style="font-weight: 700; font-size: 1rem; color: var(--text-main);"><i class="fa-solid fa-wrench" style="color: var(--primary-color);"></i> 匯出「公務車保養及狀況紀錄表」</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">匯出歷史維修、保養、驗車與狀況備註清單 (Excel 表)</div>
           </div>
           <i class="fa-solid fa-chevron-right" style="color: var(--text-muted);"></i>
         </button>

@@ -3119,6 +3119,152 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.removeChild(link);
   }
 
+  // 3. 匯出「保養及狀況紀錄 Excel 報表」
+  function exportMaintenanceRecordsExcel() {
+    if (!state.maintenanceRecords || state.maintenanceRecords.length === 0) {
+      alert('目前尚無任何保養及狀況紀錄可匯出');
+      return;
+    }
+
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // 檢查當前是否有搜尋或分類篩選
+    const q = (state.maintSearchQuery || '').trim().toLowerCase();
+    const cat = state.maintCategoryFilter || 'ALL';
+
+    let filtered = state.maintenanceRecords.filter(m => {
+      const itemStatus = m.status || 'COMPLETED';
+      if (cat === '待處理') {
+        if (itemStatus !== 'PENDING') return false;
+      } else if (cat !== 'ALL') {
+        if (m.category !== cat) return false;
+      }
+
+      if (!q) return true;
+      return (
+        (m.title || '').toLowerCase().includes(q) ||
+        (m.content || '').toLowerCase().includes(q) ||
+        (m.date || '').includes(q)
+      );
+    });
+
+    if (filtered.length === 0) {
+      alert('目前篩選條件下無符合的紀錄可匯出');
+      return;
+    }
+
+    // 依日期倒序 (最新的在最前面)
+    filtered = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const defaultVehicle = state.vehicles && state.vehicles[0] ? state.vehicles[0] : null;
+    const carPlateStr = defaultVehicle ? `${defaultVehicle.plate} (${defaultVehicle.model || '公務車'})` : 'ALZ-3759';
+
+    const catLabel = cat === 'ALL' ? '全部紀錄' : cat;
+    const catFileLabel = cat === 'ALL' ? '全部' : cat;
+
+    const now = new Date();
+    const nowTimeStr = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0') + ' ' +
+      String(now.getHours()).padStart(2, '0') + ':' +
+      String(now.getMinutes()).padStart(2, '0');
+    const dateFileStr = now.getFullYear() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+
+    let dataRowsHtml = '';
+    filtered.forEach((m, idx) => {
+      const itemStatus = m.status || 'COMPLETED';
+      const isPending = itemStatus === 'PENDING';
+      const statusText = isPending ? '⏳ 待處理' : '已完成';
+      const statusBg = isPending ? '#fef3c7' : '#ffffff';
+      const statusColor = isPending ? '#b45309' : '#000000';
+      const photoText = (m.photos && Array.isArray(m.photos) && m.photos.length > 0) ? `📸 ${m.photos.length} 張照片` : '無';
+      const contentFormatted = esc(m.content || '').replace(/\r?\n/g, '<br style="mso-data-placement:same-cell;">');
+
+      dataRowsHtml += `
+        <tr>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt;">${idx + 1}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt;">${esc(m.date || '')}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt; font-weight: bold;">${esc(m.category || '保養')}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt; background-color: ${statusBg}; color: ${statusColor}; font-weight: bold;">${statusText}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: left; height: 32px; font-size: 11pt; font-weight: bold;">${esc(m.title || '')}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: left; height: 32px; font-size: 11pt;">${contentFormatted || '無內容說明'}</td>
+          <td style="border: 1pt solid #000000; padding: 6px; text-align: center; height: 32px; font-size: 11pt;">${photoText}</td>
+        </tr>
+      `;
+    });
+
+    const excelTemplate = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]>
+<xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>保養及狀況紀錄表</x:Name>
+    <x:WorksheetOptions>
+     <x:DisplayGridlines/>
+    </x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  body { font-family: "微軟正黑體", "標楷體", Arial, sans-serif; }
+  .title-table { width: 100%; border: none; margin-bottom: 5px; }
+  .title-table td { border: none; font-size: 18pt; font-weight: bold; text-align: center; vertical-align: middle; }
+  .meta-table { width: 100%; border: none; margin-bottom: 8px; font-size: 12pt; font-weight: bold; }
+  .meta-table td { border: none; padding: 4px; vertical-align: middle; }
+  .grid-table { width: 100%; border-collapse: collapse; }
+  .grid-table th { border: 1.5pt solid #000000; background-color: #e2e8f0; font-size: 12pt; font-weight: bold; padding: 8px; height: 36px; text-align: center; vertical-align: middle; }
+  .grid-table td { border: 1pt solid #000000; font-size: 11pt; padding: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+  <table class="title-table">
+    <tr>
+      <td colspan="7" style="font-size: 18pt; font-weight: bold; text-align: center; padding: 10px;">公務車保養及狀況紀錄表</td>
+    </tr>
+  </table>
+  <table class="meta-table">
+    <tr>
+      <td colspan="4" style="text-align: left; font-size: 12pt; font-weight: bold; padding: 4px;">公務車輛：${carPlateStr}　｜　分類：${catLabel}　｜　共 ${filtered.length} 筆紀錄</td>
+      <td colspan="3" style="text-align: right; font-size: 11pt; font-weight: normal; padding: 4px;">匯出時間：${nowTimeStr}</td>
+    </tr>
+  </table>
+  <table class="grid-table" border="1" cellspacing="0" cellpadding="4">
+    <thead>
+      <tr>
+        <th style="width: 6%;">項次</th>
+        <th style="width: 17%;">日期時間</th>
+        <th style="width: 10%;">事件類別</th>
+        <th style="width: 10%;">處理狀態</th>
+        <th style="width: 23%;">事件標題 / 主旨</th>
+        <th style="width: 25%;">詳細內容與備註說明</th>
+        <th style="width: 9%;">佐證照片</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dataRowsHtml}
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const filename = `公務車保養及狀況紀錄表_${catFileLabel}_${dateFileStr}.xls`;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // 匯出彈窗控制 Modal
   const modalExportChoice = document.getElementById('modalExportChoice');
   const btnExportCsv = document.getElementById('btnExportCsv');
@@ -3159,6 +3305,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnExportSignInCsvModal) {
     btnExportSignInCsvModal.addEventListener('click', () => {
       exportSignInRecordsCsv();
+      if (modalExportChoice) modalExportChoice.classList.remove('active');
+    });
+  }
+
+  // 保養及狀況紀錄頁面工具列按鈕：匯出保養及狀況紀錄 Excel 表
+  const btnExportMaint = document.getElementById('btnExportMaint');
+  if (btnExportMaint) {
+    btnExportMaint.addEventListener('click', () => {
+      exportMaintenanceRecordsExcel();
+    });
+  }
+
+  // 彈窗內的保養紀錄匯出選項按鈕
+  const btnExportMaintModal = document.getElementById('btnExportMaintModal');
+  if (btnExportMaintModal) {
+    btnExportMaintModal.addEventListener('click', () => {
+      exportMaintenanceRecordsExcel();
       if (modalExportChoice) modalExportChoice.classList.remove('active');
     });
   }
